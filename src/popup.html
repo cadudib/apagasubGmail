@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Apaga Sub</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <h1>Apaga Sub V1.15</h1>
+          <p id="status">Escolha um termo pronto para preencher a busca do Gmail.</p>
+        </div>
+      </header>
+
+      <section class="controls">
+        <div class="preset-grid">
+          <button class="preset-button" type="button" data-query="category:promotions newer_than:1y unsubscribe">Promoções</button>
+          <button class="preset-button" type="button" data-query='newer_than:1y (unsubscribe OR "cancelar inscrição" OR descadastrar)'>Newsletters</button>
+          <button class="preset-button" type="button" data-query='newer_than:6m ("sair da lista" OR "gerenciar preferências" OR unsubscribe)'>Últimos 6 meses</button>
+          <button class="preset-button" type="button" data-query='newer_than:1y (oferta OR promoção OR cupom OR desconto OR sale)'>Lojas</button>
+          <button class="preset-button" type="button" data-query='newer_than:1y (webinar OR curso OR aula OR treinamento OR newsletter)'>Cursos</button>
+          <button class="preset-button" type="button" data-query='newer_than:1y (notification OR digest OR updates OR newsletter)'>Inglês</button>
+        </div>
+        <div class="scan-row">
+          <button id="filterSenderButton" type="button">Filtrar remetente</button>
+          <button id="scanButton" type="button">Ver linhas</button>
+          <button id="deepScanButton" type="button">Varrer página</button>
+        </div>
+        <div class="scan-options">
+          <label for="scanLimit">Varrer</label>
+          <select id="scanLimit">
+            <option value="10">10</option>
+            <option value="25" selected>25</option>
+            <option value="50">50</option>
+          </select>
+          <button id="nextPageButton" type="button">Próxima página</button>
+        </div>
+      </section>
+
+      <section class="bulk-actions">
+        <label class="checkline">
+          <input id="selectAll" type="checkbox" />
+          <span>Selecionar tudo</span>
+        </label>
+        <button id="unsubscribeButton" type="button" disabled>Sair das selecionadas</button>
+      </section>
+
+      <section id="results" class="results" aria-live="polite"></section>
+    </main>
+
+    <template id="subscriptionTemplate">
+      <article class="subscription">
+        <label class="subscription-main">
+          <input class="subscription-check" type="checkbox" />
+          <span>
+            <strong class="subscription-name"></strong>
+            <span class="subscription-email"></span>
+          </span>
+        </label>
+        <div class="subscription-meta">
+          <span class="subscription-count"></span>
+          <span class="subscription-mode"></span>
+        </div>
+      </article>
+    </template>
+
+    <script src="popup.js" type="module"></script>
+  </body>
+</html>

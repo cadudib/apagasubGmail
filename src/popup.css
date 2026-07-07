@@ -1,0 +1,221 @@
+:root {
+  color-scheme: light;
+  --bg: #f8f9fa;
+  --surface: #ffffff;
+  --text: #212529;
+  --muted: #6c757d;
+  --border: #d8dee4;
+  --primary: #0066cc;
+  --primary-hover: #0759ad;
+  --danger: #b42318;
+  --success: #067647;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  width: 460px;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Aptos", "Helvetica Neue", sans-serif;
+  font-size: 14px;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  padding: 0 12px;
+}
+
+button:hover:not(:disabled) {
+  border-color: #b6bec8;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+#scanButton,
+#deepScanButton,
+#filterSenderButton,
+#nextPageButton,
+#unsubscribeButton {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #ffffff;
+}
+
+#scanButton:hover,
+#deepScanButton:hover,
+#filterSenderButton:hover,
+#nextPageButton:hover,
+#unsubscribeButton:hover {
+  background: var(--primary-hover);
+}
+
+.shell {
+  padding: 16px;
+}
+
+.topbar {
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+h1 {
+  margin: 0 0 4px;
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.controls {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.preset-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.preset-button {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scan-row {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1fr;
+  gap: 8px;
+}
+
+.scan-options {
+  display: grid;
+  grid-template-columns: auto 72px 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.scan-options label {
+  color: var(--muted);
+}
+
+select {
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 0 8px;
+}
+
+input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--primary);
+}
+
+.bulk-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.checkline,
+.subscription-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.results {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  max-height: 420px;
+  overflow: auto;
+}
+
+.subscription {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.subscription:has(.subscription-check:checked) {
+  border-color: var(--primary);
+}
+
+.subscription-main {
+  align-items: flex-start;
+}
+
+.subscription-name {
+  display: block;
+  line-height: 1.25;
+}
+
+.subscription-email {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.subscription-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  padding-left: 26px;
+}
+
+.empty,
+.error,
+.success {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 12px;
+  line-height: 1.4;
+}
+
+.error {
+  color: var(--danger);
+}
+
+.success {
+  color: var(--success);
+}
