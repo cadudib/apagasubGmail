@@ -1,6 +1,6 @@
 (() => {
-  if (globalThis.__apagaSubVersion === "1.23.0") return;
-  globalThis.__apagaSubVersion = "1.23.0";
+  if (globalThis.__apagaSubVersion === "1.24.0") return;
+  globalThis.__apagaSubVersion = "1.24.0";
 
   const TEXT_MATCH = /(unsubscribe|unsubscribe here|cancelar inscrição|cancelar inscri[cç][aã]o|cancelar assinatura|cancelar sua assinatura|cancelar subscrição|cancelar a subscri[cç][aã]o|descadastrar|descadastre|sair da lista|remover inscrição|remover inscri[cç][aã]o|gerenciar preferências|gerenciar preferencias)/i;
 
@@ -34,6 +34,28 @@
     searchBox.dispatchEvent(new Event("change", { bubbles: true }));
     searchBox.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true }));
     searchBox.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", bubbles: true }));
+    return true;
+  }
+
+  async function runGmailSearch(query) {
+    const filled = fillSearchGmail(query);
+    await wait(1200);
+    if (location.hash.includes(`/search/${encodeURIComponent(query)}`)) return true;
+
+    const searchButton = [...document.querySelectorAll("[aria-label], [data-tooltip], [role='button'], button")]
+      .filter(isVisible)
+      .find((element) => /search|pesquisar/i.test(elementSearchText(element)));
+    if (searchButton) {
+      activateElement(searchButton);
+      await wait(1200);
+    }
+
+    if (!visibleMessageRows().length || filled) {
+      const accountPrefix = location.hash.match(/^#([^/]+)\//)?.[1] || "inbox";
+      location.hash = `#${accountPrefix}/search/${encodeURIComponent(query)}`;
+      await waitForListView(6000);
+    }
+
     return true;
   }
 
@@ -170,8 +192,7 @@
     }
 
     debug(`Limpando e-mails do remetente (${mode}): ${sender}`);
-    fillSearchGmail(`from:${sender}`);
-    await waitForListView(6000);
+    await runGmailSearch(`from:${sender}`);
 
     if (mode === "safe") {
       debug(`Modo seguro: filtro aplicado para ${sender}.`);

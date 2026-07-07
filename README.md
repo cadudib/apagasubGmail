@@ -134,9 +134,14 @@ node --check src/content.js
 
 ## Versao atual
 
-V1.23
+V1.24
 
 ## Changelog
+
+### V1.24
+
+- Corrige limpeza por remetente para forcar navegacao na busca `from:`.
+- Adiciona fallback por URL do Gmail quando o Enter no campo de busca nao dispara.
 
 ### V1.23
 
