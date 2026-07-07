@@ -8,6 +8,7 @@ const statusEl = document.querySelector("#status");
 const resultsEl = document.querySelector("#results");
 const debugLogEl = document.querySelector("#debugLog");
 const clearDebugButton = document.querySelector("#clearDebugButton");
+const copyDebugButton = document.querySelector("#copyDebugButton");
 const selectAll = document.querySelector("#selectAll");
 const template = document.querySelector("#subscriptionTemplate");
 const presetButtons = document.querySelectorAll(".preset-button");
@@ -56,6 +57,12 @@ deepScanButton.addEventListener("click", async () => {
 
 clearDebugButton.addEventListener("click", clearDebug);
 
+copyDebugButton.addEventListener("click", async () => {
+  const text = [...debugLogEl.children].map((item) => item.textContent).join("\n");
+  await navigator.clipboard.writeText(text);
+  setStatus("Debug copiado para a área de transferência.");
+});
+
 nextPageButton.addEventListener("click", async () => {
   await runAction("Avançando para a próxima página do Gmail...", async () => {
     const response = await sendToGmail({ type: "goNextPageGmail" });
@@ -87,6 +94,7 @@ unsubscribeButton.addEventListener("click", async () => {
   if (!selected.length) return;
 
   await runAction(`Saindo de ${selected.length} selecionada(s)...`, async () => {
+    markItemsProcessing(selected);
     const response = await sendToGmail({ type: "unsubscribeVisibleGmail", items: selected });
     await openResultTabs(response.results || []);
     renderResults(response.results || []);
@@ -164,6 +172,7 @@ function renderSubscriptions() {
     const checkbox = node.querySelector(".subscription-check");
 
     article.dataset.id = item.id;
+    article.dataset.state = item.actionable ? "ready" : "missing";
     checkbox.disabled = item.actionable === false;
     checkbox.addEventListener("change", syncActions);
     article.addEventListener("click", (event) => {
@@ -183,6 +192,11 @@ function renderSubscriptions() {
 }
 
 function renderResults(results) {
+  markResultStates(results);
+  if (document.querySelectorAll(".subscription").length) {
+    syncActions();
+    return;
+  }
   resultsEl.innerHTML = "";
   for (const result of results) {
     const div = document.createElement("div");
@@ -193,6 +207,29 @@ function renderResults(results) {
   subscriptions = [];
   selectAll.checked = false;
   syncActions();
+}
+
+function markResultStates(results) {
+  for (const result of results) {
+    const article = document.querySelector(`.subscription[data-id="${CSS.escape(result.id)}"]`);
+    if (!article) continue;
+    const mode = article.querySelector(".subscription-mode");
+    article.dataset.state = result.ok ? "confirmed" : "failed";
+    mode.textContent = result.ok
+      ? result.message.includes("Confirme manualmente") || result.message.includes("aberto")
+        ? "precisa manual"
+        : "confirmado"
+      : "falhou";
+  }
+}
+
+function markItemsProcessing(items) {
+  for (const item of items) {
+    const article = document.querySelector(`.subscription[data-id="${CSS.escape(item.id)}"]`);
+    if (!article) continue;
+    article.dataset.state = "processing";
+    article.querySelector(".subscription-mode").textContent = "processando";
+  }
 }
 
 async function openResultTabs(results) {

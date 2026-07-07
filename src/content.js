@@ -1,6 +1,6 @@
 (() => {
-  if (globalThis.__apagaSubVersion === "1.18.0") return;
-  globalThis.__apagaSubVersion = "1.18.0";
+  if (globalThis.__apagaSubVersion === "1.19.0") return;
+  globalThis.__apagaSubVersion = "1.19.0";
 
   const TEXT_MATCH = /(unsubscribe|unsubscribe here|cancelar inscrição|cancelar inscri[cç][aã]o|cancelar assinatura|cancelar sua assinatura|cancelar subscrição|cancelar a subscri[cç][aã]o|descadastrar|descadastre|sair da lista|remover inscrição|remover inscri[cç][aã]o|gerenciar preferências|gerenciar preferencias)/i;
 
@@ -138,22 +138,24 @@
     debug(`Descadastro iniciado: ${items.length} item(ns).`);
     for (const item of items) {
       debug(`Processando saída: ${item.label || item.detail || item.id}`);
-      if (item.kind === "rowButton") {
-        results.push(await clickRowUnsubscribe(item));
-        continue;
-      }
-      if (item.kind === "link" && item.href) {
-        results.push({ id: item.id, senderName: item.label, ok: true, urlToOpen: item.href, message: "Link de descadastro aberto para confirmação." });
-        continue;
-      }
-      if (item.kind === "link") {
-        results.push(await clickVisibleUnsubscribe(item));
-        continue;
-      }
-      results.push({ id: item.id, senderName: item.label, ok: false, message: "Use Varrer página para procurar o botão de descadastro." });
+      results.push(await processUnsubscribeItem(item));
+      await wait(1500);
     }
     debug("Descadastro finalizado.");
     return results;
+  }
+
+  async function processUnsubscribeItem(item) {
+    if (item.kind === "rowButton") {
+      return clickRowUnsubscribe(item);
+    }
+    if (item.kind === "link" && item.href) {
+      return { id: item.id, senderName: item.label, ok: true, urlToOpen: item.href, message: "Link de descadastro aberto para confirmação." };
+    }
+    if (item.kind === "link") {
+      return clickVisibleUnsubscribe(item);
+    }
+    return { id: item.id, senderName: item.label, ok: false, message: "Use Varrer página para procurar o botão de descadastro." };
   }
 
   function linkItemsFromOpenMessage(senderOverride, rowKey = "") {
@@ -207,6 +209,7 @@
         await wait(1800);
         await waitForMessageView();
       }
+      await wait(1500);
     }
     await waitFor(() => findUnsubscribeElements().length > 0, 4000);
     const element = findUnsubscribeElements().find((candidate) => elementSearchText(candidate) === item.selectorText) || findUnsubscribeElements()[0];

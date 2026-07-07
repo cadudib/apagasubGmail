@@ -134,9 +134,15 @@ node --check src/content.js
 
 ## Versao atual
 
-V1.18
+V1.19
 
 ## Changelog
+
+### V1.19
+
+- Adiciona estado visual por item durante descadastro.
+- Adiciona pausa entre descadastros para reduzir travamentos no Gmail.
+- Adiciona botao para copiar o log de debug.
 
 ### V1.18
 

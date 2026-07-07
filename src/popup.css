@@ -176,6 +176,19 @@ input[type="checkbox"] {
   border-color: var(--primary);
 }
 
+.subscription[data-state="processing"] {
+  border-color: #f59e0b;
+}
+
+.subscription[data-state="confirmed"] {
+  border-color: var(--success);
+}
+
+.subscription[data-state="manual"],
+.subscription[data-state="failed"] {
+  border-color: var(--danger);
+}
+
 .subscription-main {
   align-items: flex-start;
 }
@@ -235,7 +248,8 @@ input[type="checkbox"] {
   font-size: 12px;
 }
 
-#clearDebugButton {
+#clearDebugButton,
+#copyDebugButton {
   min-height: 28px;
   padding: 0 8px;
   font-size: 12px;
