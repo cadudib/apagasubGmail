@@ -134,9 +134,15 @@ node --check src/content.js
 
 ## Versao atual
 
-V1.19
+V1.20
 
 ## Changelog
+
+### V1.20
+
+- Torna o clique de confirmacao mais restrito a botoes reais do modal.
+- Evita clicar no titulo/texto `Cancelar inscricao` em vez do botao final.
+- Adiciona clique por coordenada no centro do controle para modais do Gmail.
 
 ### V1.19
 

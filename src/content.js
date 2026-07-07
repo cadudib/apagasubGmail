@@ -1,6 +1,6 @@
 (() => {
-  if (globalThis.__apagaSubVersion === "1.19.0") return;
-  globalThis.__apagaSubVersion = "1.19.0";
+  if (globalThis.__apagaSubVersion === "1.20.0") return;
+  globalThis.__apagaSubVersion = "1.20.0";
 
   const TEXT_MATCH = /(unsubscribe|unsubscribe here|cancelar inscrição|cancelar inscri[cç][aã]o|cancelar assinatura|cancelar sua assinatura|cancelar subscrição|cancelar a subscri[cç][aã]o|descadastrar|descadastre|sair da lista|remover inscrição|remover inscri[cç][aã]o|gerenciar preferências|gerenciar preferencias)/i;
 
@@ -341,8 +341,11 @@
 
   function activateElement(element) {
     element.scrollIntoView({ block: "center", inline: "center" });
+    const rect = element.getBoundingClientRect();
+    const clientX = rect.left + rect.width / 2;
+    const clientY = rect.top + rect.height / 2;
     for (const type of ["mouseover", "mousedown", "mouseup", "click"]) {
-      element.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
+      element.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window, clientX, clientY }));
     }
     element.click();
   }
@@ -359,15 +362,15 @@
   }
 
   function confirmationButtons() {
-    const dialogs = [...document.querySelectorAll('[role="dialog"], .Kj-JD, .J-J5-Ji')].filter(isVisible);
+    const dialogs = [...document.querySelectorAll('[role="dialog"], .Kj-JD, .J-J5-Ji, [aria-modal="true"]')].filter(isVisible);
     const roots = dialogs.length ? dialogs : [document];
-    const candidates = roots.flatMap((root) => [...root.querySelectorAll("button, [role='button'], [jsaction], [tabindex], span, div")]);
+    const candidates = roots.flatMap((root) => [...root.querySelectorAll("button, a[href], [role='button'], [jsaction][tabindex], [tabindex='0']")]);
     const seen = new Set();
     return candidates
       .filter(isVisible)
       .map((element) => closestClickable(element))
       .filter((element) => {
-        if (!element || seen.has(element) || !isVisible(element)) return false;
+        if (!element || seen.has(element) || !isVisible(element) || !isLikelyButtonControl(element)) return false;
         seen.add(element);
         return true;
       })
@@ -384,12 +387,28 @@
     return score;
   }
 
+  function isLikelyButtonControl(element) {
+    if (element.getAttribute("role") === "dialog") return false;
+    const rect = element.getBoundingClientRect();
+    const text = elementSearchText(element);
+    if (rect.width > 360 || rect.height > 96) return false;
+    if (text.length > 80) return false;
+    return (
+      element.tagName === "BUTTON" ||
+      element.tagName === "A" ||
+      element.getAttribute("role") === "button" ||
+      element.hasAttribute("jsaction") ||
+      element.tabIndex >= 0
+    );
+  }
+
   function debugVisibleDialogButtons() {
     const dialogs = [...document.querySelectorAll('[role="dialog"], .Kj-JD, .J-J5-Ji')].filter(isVisible);
     const roots = dialogs.length ? dialogs : [document];
     const labels = roots
-      .flatMap((root) => [...root.querySelectorAll("button, [role='button'], [jsaction], [tabindex]")])
+      .flatMap((root) => [...root.querySelectorAll("button, a[href], [role='button'], [jsaction][tabindex], [tabindex='0']")])
       .filter(isVisible)
+      .filter(isLikelyButtonControl)
       .map(elementSearchText)
       .filter(Boolean)
       .slice(0, 10);
