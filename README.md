@@ -134,4 +134,34 @@ node --check src/content.js
 
 ## Versao atual
 
-V1.17
+V1.18
+
+## Changelog
+
+### V1.18
+
+- Adiciona debug dos botoes visiveis no modal de confirmacao do Gmail.
+- Ajuda a diagnosticar quando a extensao abre o modal, mas nao clica no botao final automaticamente.
+
+### V1.17
+
+- Melhora a confirmacao automatica do modal `Cancelar inscricao` do Gmail.
+- Prioriza botoes dentro de dialogos/modais.
+
+### V1.16
+
+- Adiciona painel de debug no popup.
+- Registra progresso da varredura e eventos de descadastro.
+
+### V1.15
+
+- Amplia textos reconhecidos para confirmacao automatica.
+
+### V1.14
+
+- Melhora retorno para a lista apos abrir um e-mail durante a varredura.
+
+### V1.13
+
+- Adiciona seletor de varredura para 10, 25 ou 50 e-mails.
+- Adiciona botao de proxima pagina.
