@@ -1,6 +1,6 @@
 (() => {
-  if (globalThis.__apagaSubVersion === "1.16.0") return;
-  globalThis.__apagaSubVersion = "1.16.0";
+  if (globalThis.__apagaSubVersion === "1.17.0") return;
+  globalThis.__apagaSubVersion = "1.17.0";
 
   const TEXT_MATCH = /(unsubscribe|unsubscribe here|cancelar inscrição|cancelar inscri[cç][aã]o|cancelar assinatura|cancelar sua assinatura|cancelar subscrição|cancelar a subscri[cç][aã]o|descadastrar|descadastre|sair da lista|remover inscrição|remover inscri[cç][aã]o|gerenciar preferências|gerenciar preferencias)/i;
 
@@ -347,14 +347,26 @@
   async function clickVisibleConfirmation(timeout) {
     const found = await waitFor(() => confirmationButtons().length > 0, timeout);
     if (!found) return false;
-    activateElement(confirmationButtons()[0]);
+    const button = confirmationButtons()[0];
+    debug(`Clicando confirmação: ${elementSearchText(button)}`);
+    activateElement(button);
     await wait(1000);
     return true;
   }
 
   function confirmationButtons() {
-    return [...document.querySelectorAll("button, [role='button']")]
+    const dialogs = [...document.querySelectorAll('[role="dialog"], .Kj-JD, .J-J5-Ji')].filter(isVisible);
+    const roots = dialogs.length ? dialogs : [document];
+    const candidates = roots.flatMap((root) => [...root.querySelectorAll("button, [role='button'], [jsaction], [tabindex], span, div")]);
+    const seen = new Set();
+    return candidates
       .filter(isVisible)
+      .map((element) => closestClickable(element))
+      .filter((element) => {
+        if (!element || seen.has(element) || !isVisible(element)) return false;
+        seen.add(element);
+        return true;
+      })
       .filter((element) => /^(ok|sim|yes|confirmar|confirm|unsubscribe|cancelar inscrição|cancelar inscri[cç][aã]o|cancelar assinatura|cancelar subscrição|cancelar a subscri[cç][aã]o)$/i.test(elementSearchText(element)))
       .sort((a, b) => confirmationScore(b) - confirmationScore(a));
   }

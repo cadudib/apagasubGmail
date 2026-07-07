@@ -134,4 +134,4 @@ node --check src/content.js
 
 ## Versao atual
 
-V1.16
+V1.17
