@@ -134,9 +134,15 @@ node --check src/content.js
 
 ## Versao atual
 
-V1.20
+V1.21
 
 ## Changelog
+
+### V1.21
+
+- Adiciona resumo da ultima execucao no popup.
+- Salva historico local dos descadastros executados.
+- Adiciona permissao `storage` para manter o historico no Chrome.
 
 ### V1.20
 

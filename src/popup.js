@@ -6,6 +6,7 @@ const scanLimitSelect = document.querySelector("#scanLimit");
 const unsubscribeButton = document.querySelector("#unsubscribeButton");
 const statusEl = document.querySelector("#status");
 const resultsEl = document.querySelector("#results");
+const summaryTextEl = document.querySelector("#summaryText");
 const debugLogEl = document.querySelector("#debugLog");
 const clearDebugButton = document.querySelector("#clearDebugButton");
 const copyDebugButton = document.querySelector("#copyDebugButton");
@@ -97,7 +98,9 @@ unsubscribeButton.addEventListener("click", async () => {
     markItemsProcessing(selected);
     const response = await sendToGmail({ type: "unsubscribeVisibleGmail", items: selected });
     await openResultTabs(response.results || []);
+    await saveHistory(response.results || []);
     renderResults(response.results || []);
+    setRunSummary(response.results || []);
     setStatus("Processo concluído. Abas abertas ainda podem exigir confirmação.");
   });
 });
@@ -284,6 +287,25 @@ function setScanStatus(items) {
     return;
   }
   setStatus("Não achei descadastro acionável nos e-mails visíveis.");
+}
+
+function setRunSummary(results) {
+  const confirmed = results.filter((result) => result.ok && !/manual|aberto|confirme/i.test(result.message)).length;
+  const manual = results.filter((result) => result.ok && /manual|aberto|confirme/i.test(result.message)).length;
+  const failed = results.filter((result) => !result.ok).length;
+  summaryTextEl.textContent = `${confirmed} confirmado(s), ${manual} precisa(m) confirmação manual, ${failed} falhou(aram).`;
+}
+
+async function saveHistory(results) {
+  const current = await chrome.storage.local.get({ unsubscribeHistory: [] });
+  const entries = results.map((result) => ({
+    at: new Date().toISOString(),
+    senderName: result.senderName || "",
+    ok: Boolean(result.ok),
+    message: result.message || ""
+  }));
+  const unsubscribeHistory = [...entries, ...current.unsubscribeHistory].slice(0, 200);
+  await chrome.storage.local.set({ unsubscribeHistory });
 }
 
 function selectedScanLimit() {
