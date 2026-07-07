@@ -1,6 +1,6 @@
 (() => {
-  if (globalThis.__apagaSubVersion === "1.24.0") return;
-  globalThis.__apagaSubVersion = "1.24.0";
+  if (globalThis.__apagaSubVersion === "1.25.0") return;
+  globalThis.__apagaSubVersion = "1.25.0";
 
   const TEXT_MATCH = /(unsubscribe|unsubscribe here|cancelar inscrição|cancelar inscri[cç][aã]o|cancelar assinatura|cancelar sua assinatura|cancelar subscrição|cancelar a subscri[cç][aã]o|descadastrar|descadastre|sair da lista|remover inscrição|remover inscri[cç][aã]o|gerenciar preferências|gerenciar preferencias)/i;
 
@@ -32,15 +32,21 @@
     searchBox.value = query;
     searchBox.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: query }));
     searchBox.dispatchEvent(new Event("change", { bubbles: true }));
-    searchBox.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true }));
-    searchBox.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", bubbles: true }));
+    for (const type of ["keydown", "keypress", "keyup"]) {
+      searchBox.dispatchEvent(new KeyboardEvent(type, { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true, cancelable: true }));
+    }
+    const form = searchBox.closest("form");
+    if (form) {
+      form.dispatchEvent(new SubmitEvent("submit", { bubbles: true, cancelable: true }));
+      if (typeof form.submit === "function") form.submit();
+    }
     return true;
   }
 
   async function runGmailSearch(query) {
     const filled = fillSearchGmail(query);
     await wait(1200);
-    if (location.hash.includes(`/search/${encodeURIComponent(query)}`)) return true;
+    if (isSearchHash(query)) return true;
 
     const searchButton = [...document.querySelectorAll("[aria-label], [data-tooltip], [role='button'], button")]
       .filter(isVisible)
@@ -50,13 +56,21 @@
       await wait(1200);
     }
 
-    if (!visibleMessageRows().length || filled) {
-      const accountPrefix = location.hash.match(/^#([^/]+)\//)?.[1] || "inbox";
-      location.hash = `#${accountPrefix}/search/${encodeURIComponent(query)}`;
-      await waitForListView(6000);
-    }
+    if (!isSearchHash(query)) forceGmailSearchUrl(query);
+    await waitForListView(7000);
 
     return true;
+  }
+
+  function isSearchHash(query) {
+    return decodeURIComponent(location.hash).includes(`/search/${query}`);
+  }
+
+  function forceGmailSearchUrl(query) {
+    const accountPrefix = location.hash.match(/^#([^/]+)\//)?.[1] || "inbox";
+    const path = `${location.origin}${location.pathname}#${accountPrefix}/search/${encodeURIComponent(query)}`;
+    debug(`Forçando busca por URL: ${query}`);
+    location.assign(path);
   }
 
   function scanVisibleGmail() {

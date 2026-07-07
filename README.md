@@ -134,9 +134,13 @@ node --check src/content.js
 
 ## Versao atual
 
-V1.24
+V1.25
 
 ## Changelog
+
+### V1.25
+
+- Fortalece a execucao da busca `from:` com Enter completo, submit do formulario e navegacao direta por URL.
 
 ### V1.24
 
