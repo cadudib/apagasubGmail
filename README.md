@@ -134,9 +134,14 @@ node --check src/content.js
 
 ## Versao atual
 
-V1.22
+V1.23
 
 ## Changelog
+
+### V1.23
+
+- Adiciona modo de limpeza apos descadastro: seguro, semi-automatico, automatico ou desligado.
+- Usa busca `from:remetente` para limpar e-mails antigos daquele remetente.
 
 ### V1.22
 

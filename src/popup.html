@@ -10,7 +10,7 @@
     <main class="shell">
       <header class="topbar">
         <div>
-          <h1>Apaga Sub V1.22</h1>
+          <h1>Apaga Sub V1.23</h1>
           <p id="status">Escolha um termo pronto para preencher a busca do Gmail.</p>
         </div>
       </header>
@@ -37,6 +37,16 @@
             <option value="50">50</option>
           </select>
           <button id="nextPageButton" type="button">Próxima página</button>
+        </div>
+        <div class="scan-options">
+          <label for="cleanupMode">Após sair</label>
+          <select id="cleanupMode">
+            <option value="safe" selected>Seguro: só filtrar</option>
+            <option value="semi">Semi: selecionar visíveis</option>
+            <option value="auto">Auto: enviar para lixeira</option>
+            <option value="off">Não limpar</option>
+          </select>
+          <span class="option-note">Usa from:remetente</span>
         </div>
       </section>
 

@@ -1,6 +1,6 @@
 (() => {
-  if (globalThis.__apagaSubVersion === "1.22.0") return;
-  globalThis.__apagaSubVersion = "1.22.0";
+  if (globalThis.__apagaSubVersion === "1.23.0") return;
+  globalThis.__apagaSubVersion = "1.23.0";
 
   const TEXT_MATCH = /(unsubscribe|unsubscribe here|cancelar inscrição|cancelar inscri[cç][aã]o|cancelar assinatura|cancelar sua assinatura|cancelar subscrição|cancelar a subscri[cç][aã]o|descadastrar|descadastre|sair da lista|remover inscrição|remover inscri[cç][aã]o|gerenciar preferências|gerenciar preferencias)/i;
 
@@ -21,7 +21,7 @@
     if (message?.type === "scanVisibleGmail") return { ok: true, items: scanVisibleGmail() };
     if (message?.type === "scanPageGmail") return { ok: true, items: await scanPageGmail(message.limit || 25) };
     if (message?.type === "goNextPageGmail") return { ok: true, moved: goNextPageGmail() };
-    if (message?.type === "unsubscribeVisibleGmail") return { ok: true, results: await unsubscribeItems(message.items || []) };
+    if (message?.type === "unsubscribeVisibleGmail") return { ok: true, results: await unsubscribeItems(message.items || [], message.cleanupMode || "safe") };
     return { ok: false, error: "Ação desconhecida." };
   }
 
@@ -133,12 +133,16 @@
     return results;
   }
 
-  async function unsubscribeItems(items) {
+  async function unsubscribeItems(items, cleanupMode) {
     const results = [];
-    debug(`Descadastro iniciado: ${items.length} item(ns).`);
+    debug(`Descadastro iniciado: ${items.length} item(ns). Limpeza: ${cleanupMode}.`);
     for (const item of items) {
       debug(`Processando saída: ${item.label || item.detail || item.id}`);
-      results.push(await processUnsubscribeItem(item));
+      const result = await processUnsubscribeItem(item);
+      if (result.ok && cleanupMode !== "off") {
+        await cleanupSenderEmails(item, cleanupMode);
+      }
+      results.push(result);
       await wait(1500);
     }
     debug("Descadastro finalizado.");
@@ -156,6 +160,58 @@
       return clickVisibleUnsubscribe(item);
     }
     return { id: item.id, senderName: item.label, ok: false, message: "Use Varrer página para procurar o botão de descadastro." };
+  }
+
+  async function cleanupSenderEmails(item, mode) {
+    const sender = senderEmailFromItem(item);
+    if (!sender) {
+      debug("Limpeza ignorada: remetente sem e-mail claro.");
+      return false;
+    }
+
+    debug(`Limpando e-mails do remetente (${mode}): ${sender}`);
+    fillSearchGmail(`from:${sender}`);
+    await waitForListView(6000);
+
+    if (mode === "safe") {
+      debug(`Modo seguro: filtro aplicado para ${sender}.`);
+      return true;
+    }
+
+    const selected = selectVisibleMessages();
+    debug(selected ? "Mensagens visíveis selecionadas." : "Não consegui selecionar mensagens visíveis.");
+
+    if (mode === "semi") return selected;
+
+    const deleted = selected && clickTrashButton();
+    debug(deleted ? "Cliquei na lixeira para mensagens selecionadas." : "Não encontrei a lixeira.");
+    return deleted;
+  }
+
+  function senderEmailFromItem(item) {
+    const value = `${item.detail || ""} ${item.label || ""}`;
+    return value.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i)?.[0] || "";
+  }
+
+  function selectVisibleMessages() {
+    const selectBox =
+      document.querySelector('[aria-label="Select"], [aria-label="Selecionar"], [data-tooltip="Select"], [data-tooltip="Selecionar"]') ||
+      document.querySelector('div[role="checkbox"][aria-checked="false"]');
+    if (!selectBox) return false;
+    activateElement(selectBox);
+    return true;
+  }
+
+  function clickTrashButton() {
+    const trashButton = [...document.querySelectorAll("[aria-label], [data-tooltip], [role='button'], div[role='button']")]
+      .filter(isVisible)
+      .find((element) => {
+        const text = elementSearchText(element);
+        return /delete|trash|excluir|lixeira|mover para a lixeira/i.test(text);
+      });
+    if (!trashButton) return false;
+    activateElement(trashButton);
+    return true;
   }
 
   function linkItemsFromOpenMessage(senderOverride, rowKey = "") {

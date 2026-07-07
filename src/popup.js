@@ -3,6 +3,7 @@ const deepScanButton = document.querySelector("#deepScanButton");
 const filterSenderButton = document.querySelector("#filterSenderButton");
 const nextPageButton = document.querySelector("#nextPageButton");
 const scanLimitSelect = document.querySelector("#scanLimit");
+const cleanupModeSelect = document.querySelector("#cleanupMode");
 const unsubscribeButton = document.querySelector("#unsubscribeButton");
 const statusEl = document.querySelector("#status");
 const resultsEl = document.querySelector("#results");
@@ -96,7 +97,7 @@ unsubscribeButton.addEventListener("click", async () => {
 
   await runAction(`Saindo de ${selected.length} selecionada(s)...`, async () => {
     markItemsProcessing(selected);
-    const response = await sendToGmail({ type: "unsubscribeVisibleGmail", items: selected });
+    const response = await sendToGmail({ type: "unsubscribeVisibleGmail", items: selected, cleanupMode: cleanupModeSelect.value });
     await openResultTabs(response.results || []);
     await saveHistory(response.results || []);
     renderResults(response.results || []);
@@ -268,6 +269,7 @@ function setBusy(busy) {
   filterSenderButton.disabled = busy;
   nextPageButton.disabled = busy;
   scanLimitSelect.disabled = busy;
+  cleanupModeSelect.disabled = busy;
   presetButtons.forEach((button) => {
     button.disabled = busy;
   });
