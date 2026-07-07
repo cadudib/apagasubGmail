@@ -6,11 +6,18 @@ const scanLimitSelect = document.querySelector("#scanLimit");
 const unsubscribeButton = document.querySelector("#unsubscribeButton");
 const statusEl = document.querySelector("#status");
 const resultsEl = document.querySelector("#results");
+const debugLogEl = document.querySelector("#debugLog");
+const clearDebugButton = document.querySelector("#clearDebugButton");
 const selectAll = document.querySelector("#selectAll");
 const template = document.querySelector("#subscriptionTemplate");
 const presetButtons = document.querySelectorAll(".preset-button");
 
 let subscriptions = [];
+
+chrome.runtime.onMessage.addListener((message) => {
+  if (message?.type !== "debugEvent") return;
+  addDebug(message.message);
+});
 
 presetButtons.forEach((button) => {
   button.addEventListener("click", async () => {
@@ -18,6 +25,7 @@ presetButtons.forEach((button) => {
       await openGmailSearch(button.dataset.query);
       await wait(3500);
       setStatus("Varrendo resultados encontrados...");
+      clearDebug();
       const response = await sendToGmail({ type: "scanPageGmail", limit: selectedScanLimit() });
       subscriptions = response.items || [];
       renderSubscriptions();
@@ -38,12 +46,15 @@ scanButton.addEventListener("click", async () => {
 deepScanButton.addEventListener("click", async () => {
   const limit = selectedScanLimit();
   await runAction(`Varrendo até ${limit} e-mails visíveis. Não mexa no Gmail até terminar...`, async () => {
+    clearDebug();
     const response = await sendToGmail({ type: "scanPageGmail", limit });
     subscriptions = response.items || [];
     renderSubscriptions();
     setScanStatus(subscriptions);
   });
 });
+
+clearDebugButton.addEventListener("click", clearDebug);
 
 nextPageButton.addEventListener("click", async () => {
   await runAction("Avançando para a próxima página do Gmail...", async () => {
@@ -240,4 +251,18 @@ function setScanStatus(items) {
 
 function selectedScanLimit() {
   return Number(scanLimitSelect.value || 25);
+}
+
+function addDebug(message) {
+  const item = document.createElement("li");
+  item.textContent = message;
+  debugLogEl.appendChild(item);
+  while (debugLogEl.children.length > 40) {
+    debugLogEl.firstElementChild.remove();
+  }
+  debugLogEl.scrollTop = debugLogEl.scrollHeight;
+}
+
+function clearDebug() {
+  debugLogEl.innerHTML = "";
 }

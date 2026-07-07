@@ -10,7 +10,7 @@
     <main class="shell">
       <header class="topbar">
         <div>
-          <h1>Apaga Sub V1.15</h1>
+          <h1>Apaga Sub V1.16</h1>
           <p id="status">Escolha um termo pronto para preencher a busca do Gmail.</p>
         </div>
       </header>
@@ -49,6 +49,14 @@
       </section>
 
       <section id="results" class="results" aria-live="polite"></section>
+
+      <section class="debug-panel">
+        <div class="debug-header">
+          <strong>Debug</strong>
+          <button id="clearDebugButton" type="button">Limpar</button>
+        </div>
+        <ol id="debugLog" class="debug-log"></ol>
+      </section>
     </main>
 
     <template id="subscriptionTemplate">

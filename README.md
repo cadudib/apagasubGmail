@@ -16,6 +16,7 @@ Ela nao pede senha, nao usa OAuth e nao exige Google Cloud. A extensao trabalha 
 - Selecao individual clicando na linha do resultado ou no checkbox.
 - Botao `Filtrar remetente`, que busca todos os e-mails do remetente aberto usando `from:`.
 - Botao `Proxima pagina`, para continuar a varredura em outras paginas do Gmail.
+- Painel de debug com progresso e eventos recentes da varredura.
 
 ## Instalacao
 
@@ -133,4 +134,4 @@ node --check src/content.js
 
 ## Versao atual
 
-V1.15
+V1.16

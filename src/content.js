@@ -1,6 +1,6 @@
 (() => {
-  if (globalThis.__apagaSubVersion === "1.15.0") return;
-  globalThis.__apagaSubVersion = "1.15.0";
+  if (globalThis.__apagaSubVersion === "1.16.0") return;
+  globalThis.__apagaSubVersion = "1.16.0";
 
   const TEXT_MATCH = /(unsubscribe|unsubscribe here|cancelar inscrição|cancelar inscri[cç][aã]o|cancelar assinatura|cancelar sua assinatura|cancelar subscrição|cancelar a subscri[cç][aã]o|descadastrar|descadastre|sair da lista|remover inscrição|remover inscri[cç][aã]o|gerenciar preferências|gerenciar preferencias)/i;
 
@@ -10,6 +10,10 @@
       .catch((error) => sendResponse({ ok: false, error: error.message }));
     return true;
   });
+
+  function debug(message) {
+    chrome.runtime.sendMessage({ type: "debugEvent", message }).catch(() => {});
+  }
 
   async function handleMessage(message) {
     if (message?.type === "fillSearchGmail") return { ok: true, filled: fillSearchGmail(message.query || "") };
@@ -59,10 +63,15 @@
       .filter((item) => item.sender.email || item.sender.name);
     const results = [];
     const seen = new Set();
+    debug(`Varredura iniciada: ${targets.length}/${limit} e-mails visíveis.`);
 
-    for (const target of targets) {
+    for (const [index, target] of targets.entries()) {
+      debug(`Verificando ${index + 1}/${targets.length}: ${target.sender.name || target.sender.email}`);
       const row = findRowByKey(target.rowKey);
-      if (!row) continue;
+      if (!row) {
+        debug(`Linha não encontrada: ${target.sender.name || target.sender.email}`);
+        continue;
+      }
 
       const rowButton = await findRowUnsubscribeButton(row.element);
       if (rowButton) {
@@ -79,10 +88,12 @@
             source: "botão lista",
             actionable: true
           });
+          debug(`Encontrado na lista: ${target.sender.name || target.sender.email}`);
         }
         continue;
       }
 
+      debug(`Abrindo e-mail: ${target.sender.name || target.sender.email}`);
       openMessageRow(row.element);
       await wait(1800);
       await waitForMessageView();
@@ -95,6 +106,7 @@
           if (seen.has(key)) continue;
           seen.add(key);
           results.push({ ...link, id: `deep:${results.length}`, source: link.href ? "link externo" : "botão Gmail" });
+          debug(`Encontrado no e-mail: ${target.sender.name || target.sender.email} (${link.href ? "link" : "botão"})`);
         }
       } else {
         const key = `missing:${target.rowKey}`;
@@ -109,18 +121,23 @@
             source: "varredura",
             actionable: false
           });
+          debug(`Não achou descadastro: ${target.sender.name || target.sender.email}`);
         }
       }
 
-      await returnToList();
+      const returned = await returnToList();
+      debug(returned ? "Voltou para a lista." : "Não confirmou retorno para a lista.");
     }
 
+    debug(`Varredura finalizada: ${results.filter((item) => item.actionable).length} pronto(s), ${results.filter((item) => !item.actionable).length} sem link.`);
     return results;
   }
 
   async function unsubscribeItems(items) {
     const results = [];
+    debug(`Descadastro iniciado: ${items.length} item(ns).`);
     for (const item of items) {
+      debug(`Processando saída: ${item.label || item.detail || item.id}`);
       if (item.kind === "rowButton") {
         results.push(await clickRowUnsubscribe(item));
         continue;
@@ -135,6 +152,7 @@
       }
       results.push({ id: item.id, senderName: item.label, ok: false, message: "Use Varrer página para procurar o botão de descadastro." });
     }
+    debug("Descadastro finalizado.");
     return results;
   }
 
@@ -165,11 +183,19 @@
 
   async function clickRowUnsubscribe(item) {
     const row = await ensureRowVisible(item.rowKey);
-    if (!row) return { id: item.id, senderName: item.label, ok: false, message: "Não achei mais a linha desse e-mail." };
+    if (!row) {
+      debug(`Falha: linha não encontrada para ${item.label}.`);
+      return { id: item.id, senderName: item.label, ok: false, message: "Não achei mais a linha desse e-mail." };
+    }
     const button = await findRowUnsubscribeButton(row.element);
-    if (!button) return { id: item.id, senderName: item.label, ok: false, message: "O botão da lista não apareceu no hover." };
+    if (!button) {
+      debug(`Falha: botão da lista não apareceu para ${item.label}.`);
+      return { id: item.id, senderName: item.label, ok: false, message: "O botão da lista não apareceu no hover." };
+    }
+    debug(`Clicando botão da lista: ${elementSearchText(button)}`);
     activateElement(button);
     const confirmed = await clickVisibleConfirmation(5000);
+    debug(confirmed ? "Confirmação automática clicada." : "Confirmação automática não encontrada.");
     return { id: item.id, senderName: item.label, ok: true, message: confirmed ? "Botão da lista acionado e confirmação clicada." : "Botão da lista acionado. Confirme manualmente se o Gmail pedir." };
   }
 
@@ -184,9 +210,14 @@
     }
     await waitFor(() => findUnsubscribeElements().length > 0, 4000);
     const element = findUnsubscribeElements().find((candidate) => elementSearchText(candidate) === item.selectorText) || findUnsubscribeElements()[0];
-    if (!element) return { id: item.id, senderName: item.label, ok: false, message: "O botão de cancelar inscrição não está visível agora." };
+    if (!element) {
+      debug(`Falha: botão interno não visível para ${item.label}.`);
+      return { id: item.id, senderName: item.label, ok: false, message: "O botão de cancelar inscrição não está visível agora." };
+    }
+    debug(`Clicando botão interno: ${elementSearchText(element)}`);
     activateElement(element);
     const confirmed = await clickVisibleConfirmation(5000);
+    debug(confirmed ? "Confirmação automática clicada." : "Confirmação automática não encontrada.");
     return { id: item.id, senderName: item.label, ok: true, message: confirmed ? "Botão acionado e confirmação do Gmail clicada." : "Botão acionado. Se aparecer uma confirmação no Gmail, confirme manualmente." };
   }
 
