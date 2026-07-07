@@ -134,9 +134,14 @@ node --check src/content.js
 
 ## Versao atual
 
-V1.21
+V1.22
 
 ## Changelog
+
+### V1.22
+
+- Deduplica itens acionaveis por remetente/lista na visualizacao.
+- Marca itens que ja aparecem no historico local como `ja tentado`.
 
 ### V1.21
 

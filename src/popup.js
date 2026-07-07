@@ -29,7 +29,7 @@ presetButtons.forEach((button) => {
       setStatus("Varrendo resultados encontrados...");
       clearDebug();
       const response = await sendToGmail({ type: "scanPageGmail", limit: selectedScanLimit() });
-      subscriptions = response.items || [];
+      subscriptions = await prepareSubscriptions(response.items || []);
       renderSubscriptions();
       setScanStatus(subscriptions);
     });
@@ -39,7 +39,7 @@ presetButtons.forEach((button) => {
 scanButton.addEventListener("click", async () => {
   await runAction("Lendo a tela atual...", async () => {
     const response = await sendToGmail({ type: "scanVisibleGmail" });
-    subscriptions = response.items || [];
+    subscriptions = await prepareSubscriptions(response.items || []);
     renderSubscriptions();
     setStatus(subscriptions.length ? `${subscriptions.length} linha(s) visível(is). Use Varrer página para procurar descadastro.` : "Nada encontrado na tela atual.");
   });
@@ -50,7 +50,7 @@ deepScanButton.addEventListener("click", async () => {
   await runAction(`Varrendo até ${limit} e-mails visíveis. Não mexa no Gmail até terminar...`, async () => {
     clearDebug();
     const response = await sendToGmail({ type: "scanPageGmail", limit });
-    subscriptions = response.items || [];
+    subscriptions = await prepareSubscriptions(response.items || []);
     renderSubscriptions();
     setScanStatus(subscriptions);
   });
@@ -186,7 +186,7 @@ function renderSubscriptions() {
     node.querySelector(".subscription-name").textContent = item.label || "Sem nome";
     node.querySelector(".subscription-email").textContent = item.detail || "Item visível no Gmail";
     node.querySelector(".subscription-count").textContent = item.source || "Gmail";
-    node.querySelector(".subscription-mode").textContent = item.actionable ? "pronto" : "não achou";
+    node.querySelector(".subscription-mode").textContent = item.historyStatus || (item.actionable ? "pronto" : "não achou");
 
     resultsEl.appendChild(node);
   }
@@ -306,6 +306,51 @@ async function saveHistory(results) {
   }));
   const unsubscribeHistory = [...entries, ...current.unsubscribeHistory].slice(0, 200);
   await chrome.storage.local.set({ unsubscribeHistory });
+}
+
+async function prepareSubscriptions(items) {
+  const history = await loadHistoryIndex();
+  const deduped = [];
+  const seenActionable = new Set();
+
+  for (const item of items) {
+    const key = senderKey(item);
+    const historyEntry = key ? history.get(key) : null;
+    const next = {
+      ...item,
+      historyStatus: historyEntry ? (historyEntry.ok ? "já cancelado" : "já tentado") : ""
+    };
+
+    if (next.actionable && key) {
+      if (seenActionable.has(key)) continue;
+      seenActionable.add(key);
+    }
+
+    deduped.push(next);
+  }
+
+  return deduped;
+}
+
+async function loadHistoryIndex() {
+  const { unsubscribeHistory } = await chrome.storage.local.get({ unsubscribeHistory: [] });
+  const index = new Map();
+  for (const entry of unsubscribeHistory) {
+    const key = senderKey({ label: entry.senderName, detail: entry.senderName });
+    if (key && !index.has(key)) index.set(key, entry);
+  }
+  return index;
+}
+
+function senderKey(item) {
+  const value = `${item.detail || ""} ${item.label || ""}`.toLowerCase();
+  const email = value.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i)?.[0];
+  if (email) return email;
+  return (item.label || item.detail || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .slice(0, 80);
 }
 
 function selectedScanLimit() {
