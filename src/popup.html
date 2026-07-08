@@ -10,7 +10,7 @@
     <main class="shell">
       <header class="topbar">
         <div>
-          <h1>Apaga Sub V1.44</h1>
+          <h1>Apaga Sub V1.45</h1>
           <p id="status">Escolha um termo pronto para preencher a busca do Gmail.</p>
         </div>
       </header>
@@ -131,6 +131,10 @@
         <textarea id="blockedDomainsInput" rows="4"></textarea>
         <label for="protectedKeywordsInput">Palavras protegidas</label>
         <textarea id="protectedKeywordsInput" rows="3"></textarea>
+        <label class="checkline option-check">
+          <input id="requireDryRunInput" type="checkbox" />
+          <span>Exigir simulação recente antes de apagar</span>
+        </label>
         <div class="settings-actions">
           <button id="exportSettingsButton" type="button" title="Copia as configurações em JSON.">Exportar config</button>
           <button id="importSettingsButton" type="button" title="Importa configurações em JSON da área de transferência.">Importar config</button>

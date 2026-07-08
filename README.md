@@ -22,7 +22,7 @@ Ela nao pede senha, nao usa OAuth e nao exige Google Cloud. A extensao trabalha 
 
 1. Baixe a versao mais recente:
 
-   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.44.zip`
+   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.45.zip`
 
 2. Extraia o arquivo ZIP.
 
@@ -165,9 +165,17 @@ scripts/package.sh
 
 ## Versao atual
 
-V1.44
+V1.45
 
 ## Changelog
+
+### V1.45
+
+- Salva automaticamente o limite padrao escolhido.
+- Adiciona IDs de execucao para limpezas e lotes.
+- Adiciona opcao de exigir simulacao recente antes de apagar.
+- Salva relatorio pos-limpeza por execucao.
+- Adiciona `docs/ARCHITECTURE.md` com fluxo, mensagens e riscos.
 
 ### V1.44
 

@@ -34,6 +34,7 @@ const exportCsvButton = document.querySelector("#exportCsvButton");
 const openTrashButton = document.querySelector("#openTrashButton");
 const blockedDomainsInput = document.querySelector("#blockedDomainsInput");
 const protectedKeywordsInput = document.querySelector("#protectedKeywordsInput");
+const requireDryRunInput = document.querySelector("#requireDryRunInput");
 const saveSettingsButton = document.querySelector("#saveSettingsButton");
 const exportSettingsButton = document.querySelector("#exportSettingsButton");
 const importSettingsButton = document.querySelector("#importSettingsButton");
@@ -49,6 +50,7 @@ let blockedDomains = [];
 let protectedKeywords = [];
 let activeTab = "search";
 let showMoreActions = false;
+let requireDryRun = false;
 
 // Settings and safety defaults.
 const DEFAULT_BLOCKED_DOMAINS = [
@@ -155,6 +157,7 @@ backupJsonButton.addEventListener("click", async () => {
   const stored = await chrome.storage.local.get({
     cleanupHistory: [],
     unsubscribeHistory: [],
+    runReports: [],
     auditPlans: [],
     blockedDomains,
     protectedKeywords,
@@ -171,7 +174,8 @@ backupJsonButton.addEventListener("click", async () => {
     },
     history: {
       cleanupHistory: stored.cleanupHistory,
-      unsubscribeHistory: stored.unsubscribeHistory
+      unsubscribeHistory: stored.unsubscribeHistory,
+      runReports: stored.runReports
     },
     auditPlans: stored.auditPlans,
     lastOperation: stored.lastOperation,
@@ -216,14 +220,15 @@ stopActionButton.addEventListener("click", async () => {
 saveSettingsButton.addEventListener("click", async () => {
   blockedDomains = normalizeBlockedDomains(blockedDomainsInput.value.split(/\s+/));
   protectedKeywords = normalizeKeywords(protectedKeywordsInput.value.split(/\n|,/));
-  await chrome.storage.local.set({ blockedDomains, protectedKeywords });
+  requireDryRun = requireDryRunInput.checked;
+  await chrome.storage.local.set({ blockedDomains, protectedKeywords, requireDryRun });
   blockedDomainsInput.value = blockedDomains.join("\n");
   protectedKeywordsInput.value = protectedKeywords.join("\n");
   setStatus("Configurações salvas.");
 });
 
 exportSettingsButton.addEventListener("click", async () => {
-  const settings = { blockedDomains, protectedKeywords, cleanupPageLimit: selectedCleanupPageLimit() };
+  const settings = { blockedDomains, protectedKeywords, requireDryRun, cleanupPageLimit: selectedCleanupPageLimit() };
   await navigator.clipboard.writeText(JSON.stringify(settings, null, 2));
   setStatus("Configurações exportadas para a área de transferência.");
 });
@@ -233,9 +238,11 @@ importSettingsButton.addEventListener("click", async () => {
   const settings = JSON.parse(text);
   blockedDomains = normalizeBlockedDomains(settings.blockedDomains || DEFAULT_BLOCKED_DOMAINS);
   protectedKeywords = normalizeKeywords(settings.protectedKeywords || DEFAULT_PROTECTED_KEYWORDS);
-  await chrome.storage.local.set({ blockedDomains, protectedKeywords });
+  requireDryRun = Boolean(settings.requireDryRun);
+  await chrome.storage.local.set({ blockedDomains, protectedKeywords, requireDryRun });
   blockedDomainsInput.value = blockedDomains.join("\n");
   protectedKeywordsInput.value = protectedKeywords.join("\n");
+  requireDryRunInput.checked = requireDryRun;
   setStatus("Configurações importadas.");
 });
 
@@ -492,6 +499,7 @@ async function runSenderCleanup(sender, { simulate, byDomain = false, pagination
   }
   const pageLimit = pageLimitOverride ?? selectedCleanupPageLimit();
   const limitText = pageLimit === 0 ? "até acabar" : `${pageLimit} página(s)`;
+  const runId = createRunId();
   const confirmText = byDomain
     ? `ATENÇÃO: isso vai buscar e enviar para a lixeira mensagens visíveis do domínio inteiro:\n\n${domain}\n\nContinuar?`
     : `Filtrar e enviar para a lixeira os e-mails visíveis de:\n\n${sender.email}\n\nLimite: ${limitText}\n\nContinuar?`;
@@ -499,8 +507,11 @@ async function runSenderCleanup(sender, { simulate, byDomain = false, pagination
     setStatus("Ação cancelada.");
     return;
   }
+  if (!simulate && modeOverride !== "semi" && !(await dryRunAllowed(target))) {
+    throw new Error(`Simule este alvo antes de apagar: ${target}`);
+  }
   if (!simulate && modeOverride !== "semi") {
-    await saveAuditPlan({ target, query, byDomain, pageLimit, source: "single" });
+    await saveAuditPlan({ runId, target, query, byDomain, pageLimit, source: "single" });
   }
 
   setStatus(`${simulate ? "Simulando" : "Filtrando"} ${target}...`);
@@ -511,10 +522,13 @@ async function runSenderCleanup(sender, { simulate, byDomain = false, pagination
   const mode = modeOverride || (simulate ? "simulate" : "auto");
   const cleanupResponse = await sendToGmail({ type: "cleanupVisibleGmail", mode, sender: target, pageLimit, paginationOnly, confirmEachPage: confirmEachPageInput.checked });
   const cleanup = cleanupResponse.cleanup;
+  cleanup.runId = runId;
   subscriptions = [];
   renderSubscriptions();
   setCleanupSummary(cleanup);
   await saveCleanupHistory({ target, query, byDomain, cleanup });
+  await saveRunReport({ runId, target, query, byDomain, cleanup, simulate, pageLimit });
+  if (simulate) await saveDryRun(target);
   await renderHistory();
   setStatus(cleanup?.message || `Limpeza concluída para ${target}.`, cleanup?.deleted || cleanup?.simulated ? "normal" : "error");
 }
@@ -864,6 +878,7 @@ async function saveCleanupHistory({ target, query, byDomain, cleanup }) {
   const current = await chrome.storage.local.get({ cleanupHistory: [] });
   const entry = {
     at: new Date().toISOString(),
+    runId: cleanup.runId || "",
     target,
     query,
     type: byDomain ? "domínio" : "remetente",
@@ -884,10 +899,34 @@ async function saveCleanupHistory({ target, query, byDomain, cleanup }) {
   await chrome.storage.local.set({ cleanupHistory });
 }
 
+async function saveRunReport({ runId, target, query, byDomain, cleanup, simulate, pageLimit }) {
+  const current = await chrome.storage.local.get({ runReports: [] });
+  const report = {
+    at: new Date().toISOString(),
+    runId,
+    target,
+    query,
+    type: byDomain ? "domínio" : "remetente",
+    simulated: Boolean(simulate),
+    limit: pageLimit,
+    pagesDeleted: Number(cleanup?.pagesDeleted || 0),
+    visibleCount: Number(cleanup?.visibleCount || 0),
+    pagesSeen: Number(cleanup?.pagesSeen || 0),
+    deleted: Boolean(cleanup?.deleted),
+    stopped: Boolean(cleanup?.stopped),
+    stopReason: cleanup?.stopReason || "",
+    message: cleanup?.message || ""
+  };
+  const runReports = [report, ...current.runReports].slice(0, 80);
+  await chrome.storage.local.set({ runReports });
+  summaryTextEl.textContent = `Execução ${runId}: ${report.message}`;
+}
+
 async function saveAuditPlan(plan) {
   const current = await chrome.storage.local.get({ auditPlans: [] });
   const entry = {
     at: new Date().toISOString(),
+    runId: plan.runId || "",
     target: plan.target,
     query: plan.query,
     type: plan.byDomain ? "domínio" : "remetente",
@@ -924,11 +963,13 @@ async function renderHistory() {
 
 // Settings and safety helpers.
 async function loadSettings() {
-  const stored = await chrome.storage.local.get({ blockedDomains: DEFAULT_BLOCKED_DOMAINS, protectedKeywords: DEFAULT_PROTECTED_KEYWORDS, uiPrefs: {} });
+  const stored = await chrome.storage.local.get({ blockedDomains: DEFAULT_BLOCKED_DOMAINS, protectedKeywords: DEFAULT_PROTECTED_KEYWORDS, requireDryRun: false, uiPrefs: {} });
   blockedDomains = normalizeBlockedDomains(stored.blockedDomains);
   protectedKeywords = normalizeKeywords(stored.protectedKeywords);
+  requireDryRun = Boolean(stored.requireDryRun);
   blockedDomainsInput.value = blockedDomains.join("\n");
   protectedKeywordsInput.value = protectedKeywords.join("\n");
+  requireDryRunInput.checked = requireDryRun;
   if (stored.uiPrefs?.mode) uiModeSelect.value = stored.uiPrefs.mode;
   if (stored.uiPrefs?.tab) activeTab = stored.uiPrefs.tab;
   if (typeof stored.uiPrefs?.showMoreActions === "boolean") showMoreActions = stored.uiPrefs.showMoreActions;
@@ -1039,6 +1080,24 @@ function protectedKeywordReason(item) {
 
 function yesNo(value) {
   return value ? "ok" : "não";
+}
+
+function createRunId(prefix = "run") {
+  const stamp = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
+  return `${prefix}-${stamp}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
+async function saveDryRun(target) {
+  const current = await chrome.storage.local.get({ dryRuns: {} });
+  const dryRuns = { ...current.dryRuns, [target]: Date.now() };
+  await chrome.storage.local.set({ dryRuns });
+}
+
+async function dryRunAllowed(target) {
+  if (!requireDryRun) return true;
+  const { dryRuns } = await chrome.storage.local.get({ dryRuns: {} });
+  const at = Number(dryRuns[target] || 0);
+  return Date.now() - at <= 15 * 60 * 1000;
 }
 
 async function stopRequested() {

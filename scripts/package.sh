@@ -11,7 +11,7 @@ rm -f "${ZIP_PATH}"
 
 (
   cd "${ROOT_DIR}"
-  zip -r "${ZIP_PATH}" README.md manifest.json src
+zip -r "${ZIP_PATH}" README.md manifest.json src docs
 )
 
 unzip -l "${ZIP_PATH}" | grep -q " manifest.json$"
