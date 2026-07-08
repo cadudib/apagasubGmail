@@ -1,9 +1,10 @@
 (() => {
-  if (globalThis.__apagaSubVersion === "1.42.0") return;
-  globalThis.__apagaSubVersion = "1.42.0";
+  if (globalThis.__apagaSubVersion === "1.43.0") return;
+  globalThis.__apagaSubVersion = "1.43.0";
 
   const TEXT_MATCH = /(unsubscribe|unsubscribe here|cancelar inscrição|cancelar inscri[cç][aã]o|cancelar assinatura|cancelar sua assinatura|cancelar subscrição|cancelar a subscri[cç][aã]o|descadastrar|descadastre|sair da lista|remover inscrição|remover inscri[cç][aã]o|gerenciar preferências|gerenciar preferencias)/i;
 
+  // Message routing.
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     handleMessage(message)
       .then(sendResponse)
@@ -79,6 +80,7 @@
       rows: visibleMessageRows().length,
       selectBox: Boolean(findTopSelectBox()),
       trashButton: Boolean(findToolbarTrashButton()),
+      activeSelection: selectionLooksActive(),
       nextPageButton: Boolean(nextButton),
       nextPageLabel: nextButton ? controlLabelText(nextButton) || elementSearchText(nextButton) : "",
       nextPageDisabled: nextButton ? nextButton.getAttribute("aria-disabled") === "true" : false,
@@ -462,6 +464,10 @@
       debugToolbarControls();
       return false;
     }
+    if (!selectionLooksActive()) {
+      debug("Não cliquei na lixeira: não detectei seleção ativa no Gmail.");
+      return false;
+    }
     debug(`Clicando lixeira: ${controlLabelText(trashButton) || elementSearchText(trashButton) || trashButton.getAttribute("act") || "controle sem rótulo"}`);
     activateElement(trashButton);
     return true;
@@ -512,6 +518,16 @@
         if (rect.width > 360 || rect.height > 80) return false;
         const text = elementSearchText(element);
         return /^(todos|all)$/i.test(text) || /^selecionar todos$/i.test(text);
+      });
+  }
+
+  function selectionLooksActive() {
+    const firstRowTop = visibleMessageRows()[0]?.element.getBoundingClientRect().top || 260;
+    return [...document.querySelectorAll('[role="checkbox"][aria-checked="true"], [role="checkbox"][aria-checked="mixed"], input[type="checkbox"]:checked')]
+      .filter(isVisible)
+      .some((element) => {
+        const rect = element.getBoundingClientRect();
+        return rect.top <= firstRowTop + 80 || Boolean(element.closest("tr[role='row']"));
       });
   }
 

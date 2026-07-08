@@ -28,6 +28,7 @@ const historyLogEl = document.querySelector("#historyLog");
 const clearDebugButton = document.querySelector("#clearDebugButton");
 const copyDebugButton = document.querySelector("#copyDebugButton");
 const exportLogButton = document.querySelector("#exportLogButton");
+const backupJsonButton = document.querySelector("#backupJsonButton");
 const exportCsvButton = document.querySelector("#exportCsvButton");
 const openTrashButton = document.querySelector("#openTrashButton");
 const blockedDomainsInput = document.querySelector("#blockedDomainsInput");
@@ -40,12 +41,14 @@ const template = document.querySelector("#subscriptionTemplate");
 const presetButtons = document.querySelectorAll(".preset-button");
 const tabButtons = document.querySelectorAll(".tab-button");
 
+// Runtime state.
 let subscriptions = [];
 let busy = false;
 let blockedDomains = [];
 let protectedKeywords = [];
 let activeTab = "search";
 
+// Settings and safety defaults.
 const DEFAULT_BLOCKED_DOMAINS = [
   "google.com",
   "accounts.google.com",
@@ -83,6 +86,7 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 });
 
+// Search and scan actions.
 presetButtons.forEach((button) => {
   button.addEventListener("click", async () => {
     await runAction("Preenchendo a busca do Gmail...", async () => {
@@ -143,6 +147,36 @@ exportLogButton.addEventListener("click", async () => {
   ].join("\n");
   await navigator.clipboard.writeText(report);
   setStatus("Log exportado para a área de transferência.");
+});
+
+backupJsonButton.addEventListener("click", async () => {
+  const stored = await chrome.storage.local.get({
+    cleanupHistory: [],
+    unsubscribeHistory: [],
+    auditPlans: [],
+    blockedDomains,
+    protectedKeywords,
+    lastOperation: null
+  });
+  const debug = [...debugLogEl.children].map((item) => item.textContent);
+  const backup = {
+    exportedAt: new Date().toISOString(),
+    version: "V1.43",
+    settings: {
+      blockedDomains: stored.blockedDomains,
+      protectedKeywords: stored.protectedKeywords,
+      cleanupPageLimit: selectedCleanupPageLimit()
+    },
+    history: {
+      cleanupHistory: stored.cleanupHistory,
+      unsubscribeHistory: stored.unsubscribeHistory
+    },
+    auditPlans: stored.auditPlans,
+    lastOperation: stored.lastOperation,
+    debug
+  };
+  await navigator.clipboard.writeText(JSON.stringify(backup, null, 2));
+  setStatus("Backup JSON copiado para a área de transferência.");
 });
 
 exportCsvButton.addEventListener("click", async () => {
@@ -271,7 +305,15 @@ diagnosticButton.addEventListener("click", async () => {
     const response = await sendToGmail({ type: "diagnoseGmail" });
     const info = response.diagnostic;
     const nextDetail = info.nextPageButton ? ` (${info.nextPageLabel || "sem rótulo"}${info.nextPageDisabled ? ", desativada" : ""})` : "";
-    const message = `Diagnóstico: busca ${yesNo(info.searchBox)}, linhas ${info.rows}, seleção ${yesNo(info.selectBox)}, lixeira ${yesNo(info.trashButton)}, próxima ${yesNo(info.nextPageButton)}${nextDetail}.`;
+    const checks = [
+      ["busca", info.searchBox],
+      ["linhas", info.rows > 0],
+      ["seleção", info.selectBox],
+      ["seleção ativa", info.activeSelection],
+      ["lixeira", info.trashButton],
+      ["próxima", info.nextPageButton]
+    ];
+    const message = `Diagnóstico: ${checks.map(([label, ok]) => `${ok ? "PASS" : "FAIL"} ${label}`).join(", ")}; linhas ${info.rows}; próxima ${yesNo(info.nextPageButton)}${nextDetail}.`;
     addDebug(message);
     setStatus(message);
   });
@@ -348,6 +390,7 @@ batchDeleteButton.addEventListener("click", async () => {
   await runBatchCleanup({ simulate: false });
 });
 
+// Gmail communication.
 async function openGmailSearch(query) {
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     try {
@@ -418,6 +461,7 @@ async function runAction(message, action) {
   }
 }
 
+// Cleanup workflows.
 async function runSenderCleanup(sender, { simulate, byDomain = false, paginationOnly = false, pageLimitOverride = null, modeOverride = "" }) {
   if (!sender?.email) {
     throw new Error("Abra um e-mail com remetente visível para limpar automaticamente por endereço.");
@@ -440,6 +484,9 @@ async function runSenderCleanup(sender, { simulate, byDomain = false, pagination
   if (!simulate && !confirm(confirmText)) {
     setStatus("Ação cancelada.");
     return;
+  }
+  if (!simulate && modeOverride !== "semi") {
+    await saveAuditPlan({ target, query, byDomain, pageLimit, source: "single" });
   }
 
   setStatus(`${simulate ? "Simulando" : "Filtrando"} ${target}...`);
@@ -482,6 +529,9 @@ async function runBatchCleanup({ simulate }) {
   const preview = runnable.slice(0, 12).join("\n");
   const blockedText = blocked.length ? `\n\nBloqueados/ignorados:\n${blocked.slice(0, 8).join("\n")}` : "";
   if (!simulate && !confirm(`Executar apagar lote para ${runnable.length} remetente(s)?\n\nLimite por remetente: ${limitText}\n\nRemetentes:\n${preview}${runnable.length > 12 ? "\n..." : ""}${blockedText}\n\nContinuar?`)) return;
+  if (!simulate) {
+    await saveAuditPlan({ target: runnable.join(", "), query: "batch", byDomain: false, pageLimit: limit, source: "batch", count: runnable.length });
+  }
 
   await runAction(simulate ? "Simulando lote..." : "Apagando lote...", async () => {
     renderBatchQueue(runnable, "pendente");
@@ -547,6 +597,7 @@ function renderSubscriptions() {
   syncActions();
 }
 
+// Rendering and state helpers.
 function renderResults(results) {
   markResultStates(results);
   if (document.querySelectorAll(".subscription").length) {
@@ -797,6 +848,24 @@ async function saveCleanupHistory({ target, query, byDomain, cleanup }) {
   await chrome.storage.local.set({ cleanupHistory });
 }
 
+async function saveAuditPlan(plan) {
+  const current = await chrome.storage.local.get({ auditPlans: [] });
+  const entry = {
+    at: new Date().toISOString(),
+    target: plan.target,
+    query: plan.query,
+    type: plan.byDomain ? "domínio" : "remetente",
+    source: plan.source || "single",
+    count: plan.count || 1,
+    limit: plan.pageLimit,
+    blockedDomains,
+    protectedKeywords
+  };
+  const auditPlans = [entry, ...current.auditPlans].slice(0, 50);
+  await chrome.storage.local.set({ auditPlans });
+  addDebug(`Plano de auditoria salvo: ${entry.source} ${entry.target}, limite ${entry.limit === 0 ? "até acabar" : entry.limit}.`);
+}
+
 async function renderHistory() {
   if (!historyLogEl) return;
   const { cleanupHistory } = await chrome.storage.local.get({ cleanupHistory: [] });
@@ -817,6 +886,7 @@ async function renderHistory() {
   }
 }
 
+// Settings and safety helpers.
 async function loadSettings() {
   const stored = await chrome.storage.local.get({ blockedDomains: DEFAULT_BLOCKED_DOMAINS, protectedKeywords: DEFAULT_PROTECTED_KEYWORDS });
   blockedDomains = normalizeBlockedDomains(stored.blockedDomains);
