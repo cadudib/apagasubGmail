@@ -1,6 +1,6 @@
 (() => {
-  if (globalThis.__apagaSubVersion === "1.26.0") return;
-  globalThis.__apagaSubVersion = "1.26.0";
+  if (globalThis.__apagaSubVersion === "1.28.0") return;
+  globalThis.__apagaSubVersion = "1.28.0";
 
   const TEXT_MATCH = /(unsubscribe|unsubscribe here|cancelar inscrição|cancelar inscri[cç][aã]o|cancelar assinatura|cancelar sua assinatura|cancelar subscrição|cancelar a subscri[cç][aã]o|descadastrar|descadastre|sair da lista|remover inscrição|remover inscri[cç][aã]o|gerenciar preferências|gerenciar preferencias)/i;
 
@@ -22,6 +22,7 @@
     if (message?.type === "scanPageGmail") return { ok: true, items: await scanPageGmail(message.limit || 25) };
     if (message?.type === "goNextPageGmail") return { ok: true, moved: goNextPageGmail() };
     if (message?.type === "unsubscribeVisibleGmail") return { ok: true, results: await unsubscribeItems(message.items || [], message.cleanupMode || "safe") };
+    if (message?.type === "cleanupVisibleGmail") return { ok: true, cleanup: await cleanupVisibleMessages(message.mode || "safe", message.sender || "") };
     return { ok: false, error: "Ação desconhecida." };
   }
 
@@ -41,36 +42,6 @@
       if (typeof form.submit === "function") form.submit();
     }
     return true;
-  }
-
-  async function runGmailSearch(query) {
-    const filled = fillSearchGmail(query);
-    await wait(1200);
-    if (isSearchHash(query)) return true;
-
-    const searchButton = [...document.querySelectorAll("[aria-label], [data-tooltip], [role='button'], button")]
-      .filter(isVisible)
-      .find((element) => /search|pesquisar/i.test(elementSearchText(element)));
-    if (searchButton) {
-      activateElement(searchButton);
-      await wait(1200);
-    }
-
-    if (!isSearchHash(query)) forceGmailSearchUrl(query);
-    await waitForListView(7000);
-
-    return true;
-  }
-
-  function isSearchHash(query) {
-    return decodeURIComponent(location.hash).includes(`/search/${query}`);
-  }
-
-  function forceGmailSearchUrl(query) {
-    const accountPrefix = location.hash.match(/^#([^/]+)\//)?.[1] || "inbox";
-    const path = `${location.origin}${location.pathname}#${accountPrefix}/search/${encodeURIComponent(query)}`;
-    debug(`Forçando busca por URL: ${query}`);
-    location.assign(path);
   }
 
   function scanVisibleGmail() {
@@ -178,14 +149,12 @@
       const result = await processUnsubscribeItem(item);
       result.senderEmail = senderEmailFromItem(item);
       result.cleanupMode = cleanupMode;
-      if (result.ok && !result.urlToOpen && cleanupMode !== "off") {
-        result.cleanup = await cleanupSenderEmails(item, cleanupMode);
-      } else {
-        result.cleanup = {
-          attempted: false,
-          message: result.urlToOpen ? "Link externo aberto; limpeza não executada automaticamente." : "Limpeza desligada."
-        };
-      }
+      result.cleanup = {
+        attempted: false,
+        sender: result.senderEmail,
+        mode: cleanupMode,
+        message: result.urlToOpen ? "Link externo aberto; limpeza não executada automaticamente." : "Limpeza pendente no popup."
+      };
       results.push(result);
       await wait(1500);
     }
@@ -210,15 +179,19 @@
     return { id: item.id, senderName: item.label, ok: false, message: "Use Varrer página para procurar o botão de descadastro." };
   }
 
-  async function cleanupSenderEmails(item, mode) {
-    const sender = senderEmailFromItem(item);
+  async function cleanupVisibleMessages(mode, sender) {
+    mode = normalizeCleanupMode(mode);
     if (!sender) {
       debug("Limpeza ignorada: remetente sem e-mail claro.");
       return { attempted: false, sender: "", mode, message: "Remetente sem e-mail claro." };
     }
 
-    debug(`Limpando e-mails do remetente (${mode}): ${sender}`);
-    await runGmailSearch(`from:${sender}`);
+    debug(`Limpando mensagens visíveis (${mode}): ${sender}`);
+    const listReady = await waitForListView(10000);
+    if (!listReady) {
+      debug(`Limpeza falhou: lista não carregou para ${sender}.`);
+      return { attempted: true, sender, mode, selected: false, deleted: false, message: "A busca do remetente não carregou a lista a tempo." };
+    }
 
     if (mode === "safe") {
       debug(`Modo seguro: filtro aplicado para ${sender}.`);
@@ -227,6 +200,7 @@
 
     const selected = selectVisibleMessages();
     debug(selected ? "Mensagens visíveis selecionadas." : "Não consegui selecionar mensagens visíveis.");
+    if (selected) await wait(1200);
 
     if (mode === "semi") {
       return {
@@ -238,8 +212,9 @@
       };
     }
 
-    const deleted = selected && clickTrashButton();
+    const deleted = selected && await waitFor(() => clickTrashButton(), 7000);
     debug(deleted ? "Cliquei na lixeira para mensagens selecionadas." : "Não encontrei a lixeira.");
+    if (deleted) await wait(1500);
     return {
       attempted: true,
       sender,

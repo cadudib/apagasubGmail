@@ -22,7 +22,7 @@ Ela nao pede senha, nao usa OAuth e nao exige Google Cloud. A extensao trabalha 
 
 1. Baixe a versao mais recente:
 
-   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.26.zip`
+   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.28.zip`
 
 2. Extraia o arquivo ZIP.
 
@@ -142,9 +142,20 @@ scripts/package.sh
 
 ## Versao atual
 
-V1.26
+V1.28
 
 ## Changelog
+
+### V1.28
+
+- Força a busca `from:` por URL em cada remetente antes de limpar, mesmo quando o campo de busca aceita o texto.
+- Espera a lista do Gmail carregar antes de selecionar mensagens e espera a barra de ações antes de clicar na lixeira.
+- Mantém o loop de limpeza remetente por remetente até terminar todos os itens selecionados.
+
+### V1.27
+
+- Corrige falha do modo `Auto: enviar para lixeira` quando a busca `from:` mudava a tela do Gmail antes da resposta do content script.
+- Separa descadastro e limpeza em comandos curtos para evitar canal de mensagem fechado durante navegacao do Gmail.
 
 ### V1.26
 

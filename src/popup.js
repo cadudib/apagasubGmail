@@ -101,6 +101,7 @@ unsubscribeButton.addEventListener("click", async () => {
     markItemsProcessing(selected);
     const response = await sendToGmail({ type: "unsubscribeVisibleGmail", items: selected, cleanupMode: cleanupModeSelect.value });
     await openResultTabs(response.results || []);
+    await cleanupAfterUnsubscribe(response.results || []);
     await saveHistory(response.results || []);
     renderResults(response.results || []);
     setRunSummary(response.results || []);
@@ -119,8 +120,11 @@ selectAll.addEventListener("change", () => {
 cleanupModeSelect.addEventListener("change", syncActions);
 
 async function openGmailSearch(query) {
-  const response = await sendToGmail({ type: "fillSearchGmail", query });
-  if (response.filled) return;
+  try {
+    await sendToGmail({ type: "fillSearchGmail", query });
+  } catch (error) {
+    addDebug(`Busca pelo campo falhou; aplicando URL direta: ${error.message}`);
+  }
 
   const tab = await currentGmailTab();
   const url = new URL(tab.url);
@@ -275,6 +279,47 @@ async function openResultTabs(results) {
         result.ok = false;
         result.message = `Não consegui abrir o link de descadastro: ${error.message}`;
       }
+    }
+  }
+}
+
+async function cleanupAfterUnsubscribe(results) {
+  const mode = cleanupModeSelect.value;
+  if (mode === "off") {
+    results.forEach((result) => {
+      result.cleanup = { attempted: false, mode, message: "Limpeza desligada." };
+    });
+    return;
+  }
+
+  for (const result of results) {
+    if (!result.ok) continue;
+    if (result.urlToOpen) {
+      result.cleanup = {
+        attempted: false,
+        sender: result.senderEmail || "",
+        mode,
+        message: "Link externo aberto; limpeza não executada automaticamente."
+      };
+      continue;
+    }
+
+    const sender = result.senderEmail || result.cleanup?.sender || "";
+    if (!sender) {
+      result.cleanup = { attempted: false, sender: "", mode, message: "Remetente sem e-mail claro." };
+      continue;
+    }
+
+    setStatus(`Limpando e-mails de ${sender}...`);
+    await openGmailSearch(`from:${sender}`);
+    await wait(4000);
+
+    try {
+      const response = await sendToGmail({ type: "cleanupVisibleGmail", mode, sender });
+      result.cleanup = response.cleanup || { attempted: false, sender, mode, message: "Limpeza sem resposta detalhada." };
+    } catch (error) {
+      result.cleanup = { attempted: false, sender, mode, message: `Falha na limpeza: ${error.message}` };
+      addDebug(result.cleanup.message);
     }
   }
 }
