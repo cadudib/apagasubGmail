@@ -22,7 +22,7 @@ Ela nao pede senha, nao usa OAuth e nao exige Google Cloud. A extensao trabalha 
 
 1. Baixe a versao mais recente:
 
-   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.31.zip`
+   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.32.zip`
 
 2. Extraia o arquivo ZIP.
 
@@ -142,9 +142,14 @@ scripts/package.sh
 
 ## Versao atual
 
-V1.31
+V1.32
 
 ## Changelog
+
+### V1.32
+
+- Restringe o clique de apagar ao botão da barra de ações do Gmail, evitando abrir a pasta `Lixeira` da lateral.
+- Restringe a seleção ao checkbox superior da lista antes das mensagens visíveis.
 
 ### V1.31
 

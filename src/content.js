@@ -1,6 +1,6 @@
 (() => {
-  if (globalThis.__apagaSubVersion === "1.31.0") return;
-  globalThis.__apagaSubVersion = "1.31.0";
+  if (globalThis.__apagaSubVersion === "1.32.0") return;
+  globalThis.__apagaSubVersion = "1.32.0";
 
   const TEXT_MATCH = /(unsubscribe|unsubscribe here|cancelar inscrição|cancelar inscri[cç][aã]o|cancelar assinatura|cancelar sua assinatura|cancelar subscrição|cancelar a subscri[cç][aã]o|descadastrar|descadastre|sair da lista|remover inscrição|remover inscri[cç][aã]o|gerenciar preferências|gerenciar preferencias)/i;
 
@@ -269,9 +269,14 @@
   }
 
   function selectVisibleMessages() {
-    const selectBox =
-      document.querySelector('[aria-label="Select"], [aria-label="Selecionar"], [data-tooltip="Select"], [data-tooltip="Selecionar"]') ||
-      document.querySelector('div[role="checkbox"][aria-checked="false"]');
+    const firstRow = visibleMessageRows()[0]?.element;
+    const rowTop = firstRow?.getBoundingClientRect().top || 260;
+    const selectBox = [...document.querySelectorAll('[aria-label="Select"], [aria-label="Selecionar"], [data-tooltip="Select"], [data-tooltip="Selecionar"], div[role="checkbox"][aria-checked="false"]')]
+      .filter(isVisible)
+      .filter((element) => {
+        const rect = element.getBoundingClientRect();
+        return rect.top < rowTop && rect.width <= 80 && rect.height <= 80;
+      })[0];
     if (!selectBox) return false;
     activateElement(selectBox);
     return true;
@@ -280,13 +285,26 @@
   function clickTrashButton() {
     const trashButton = [...document.querySelectorAll("[aria-label], [data-tooltip], [role='button'], div[role='button']")]
       .filter(isVisible)
+      .filter(isToolbarControl)
       .find((element) => {
-        const text = elementSearchText(element);
-        return /delete|trash|excluir|lixeira|mover para a lixeira/i.test(text);
+        const text = controlLabelText(element);
+        return /^(delete|trash|excluir|mover para a lixeira|move to trash)$/i.test(text) || /delete|mover para a lixeira|move to trash/i.test(text);
       });
     if (!trashButton) return false;
     activateElement(trashButton);
     return true;
+  }
+
+  function controlLabelText(element) {
+    return cleanText([element.getAttribute("aria-label"), element.getAttribute("title"), element.getAttribute("data-tooltip"), element.getAttribute("data-tooltip-content")].filter(Boolean).join(" "));
+  }
+
+  function isToolbarControl(element) {
+    if (element.closest('a[href*="#trash"], a[href*="#bin"], a[href*="#inbox"], a[href*="#sent"], a[href*="#drafts"]')) return false;
+    const rect = element.getBoundingClientRect();
+    if (rect.width > 120 || rect.height > 80) return false;
+    const firstRowTop = visibleMessageRows()[0]?.element.getBoundingClientRect().top || 260;
+    return rect.top < firstRowTop;
   }
 
   function linkItemsFromOpenMessage(senderOverride, rowKey = "") {
