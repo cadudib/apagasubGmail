@@ -22,7 +22,7 @@ Ela nao pede senha, nao usa OAuth e nao exige Google Cloud. A extensao trabalha 
 
 1. Baixe a versao mais recente:
 
-   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.28.zip`
+   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.29.zip`
 
 2. Extraia o arquivo ZIP.
 
@@ -142,9 +142,13 @@ scripts/package.sh
 
 ## Versao atual
 
-V1.28
+V1.29
 
 ## Changelog
+
+### V1.29
+
+- Corrige `Filtrar remetente` aberto dentro de um e-mail para navegar direto para `#search/from:...`, evitando voltar para a caixa de entrada sem buscar.
 
 ### V1.28
 

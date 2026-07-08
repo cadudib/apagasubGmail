@@ -128,8 +128,7 @@ async function openGmailSearch(query) {
 
   const tab = await currentGmailTab();
   const url = new URL(tab.url);
-  const accountPrefix = url.hash.match(/^#([^/]+)\//)?.[1] || "inbox";
-  const searchUrl = `${url.origin}${url.pathname}#${accountPrefix}/search/${encodeURIComponent(query)}`;
+  const searchUrl = `${url.origin}${url.pathname}#search/${encodeURIComponent(query)}`;
   await chrome.tabs.update(tab.id, { url: searchUrl });
 }
 
