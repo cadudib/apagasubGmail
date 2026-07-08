@@ -22,7 +22,7 @@ Ela nao pede senha, nao usa OAuth e nao exige Google Cloud. A extensao trabalha 
 
 1. Baixe a versao mais recente:
 
-   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.15.zip`
+   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.26.zip`
 
 2. Extraia o arquivo ZIP.
 
@@ -113,6 +113,7 @@ Esta extensao nao usa a API oficial do Gmail. Por isso:
 - Mudancas no layout do Gmail podem exigir ajustes.
 - Alguns descadastros abrem paginas externas e precisam de confirmacao manual.
 - Links externos de descadastro sao abertos somente quando usam `http:` ou `https:`.
+- O modo automatico de limpeza pede confirmacao antes de enviar mensagens para a lixeira.
 - Alguns e-mails escondem o descadastro em rodapes, imagens ou paginas externas.
 - A varredura trabalha por pagina visivel, nao pela caixa inteira de uma vez.
 
@@ -135,9 +136,16 @@ node --check src/content.js
 
 ## Versao atual
 
-V1.25
+V1.26
 
 ## Changelog
+
+### V1.26
+
+- Adiciona confirmacao explicita antes do modo automatico enviar e-mails para a lixeira.
+- Mostra preview do modo de limpeza e quantidade de remetentes detectados.
+- Registra remetente, modo de limpeza e dominio externo no historico local.
+- Retorna resultado detalhado da limpeza por remetente para facilitar debug.
 
 ### V1.25
 

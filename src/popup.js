@@ -8,6 +8,7 @@ const unsubscribeButton = document.querySelector("#unsubscribeButton");
 const statusEl = document.querySelector("#status");
 const resultsEl = document.querySelector("#results");
 const summaryTextEl = document.querySelector("#summaryText");
+const cleanupPreviewEl = document.querySelector("#cleanupPreview");
 const debugLogEl = document.querySelector("#debugLog");
 const clearDebugButton = document.querySelector("#clearDebugButton");
 const copyDebugButton = document.querySelector("#copyDebugButton");
@@ -94,6 +95,7 @@ filterSenderButton.addEventListener("click", async () => {
 unsubscribeButton.addEventListener("click", async () => {
   const selected = selectedSubscriptions();
   if (!selected.length) return;
+  if (!confirmCleanupMode(selected)) return;
 
   await runAction(`Saindo de ${selected.length} selecionada(s)...`, async () => {
     markItemsProcessing(selected);
@@ -113,6 +115,8 @@ selectAll.addEventListener("change", () => {
   });
   syncActions();
 });
+
+cleanupModeSelect.addEventListener("change", syncActions);
 
 async function openGmailSearch(query) {
   const response = await sendToGmail({ type: "fillSearchGmail", query });
@@ -300,6 +304,7 @@ function selectedSubscriptions() {
 
 function syncActions() {
   unsubscribeButton.disabled = selectedSubscriptions().length === 0;
+  updateCleanupPreview();
 }
 
 function setBusy(busy) {
@@ -334,7 +339,8 @@ function setRunSummary(results) {
   const confirmed = results.filter((result) => result.ok && !/manual|aberto|confirme/i.test(result.message)).length;
   const manual = results.filter((result) => result.ok && /manual|aberto|confirme/i.test(result.message)).length;
   const failed = results.filter((result) => !result.ok).length;
-  summaryTextEl.textContent = `${confirmed} confirmado(s), ${manual} precisa(m) confirmação manual, ${failed} falhou(aram).`;
+  const cleaned = results.filter((result) => result.cleanup?.attempted).length;
+  summaryTextEl.textContent = `${confirmed} confirmado(s), ${manual} precisa(m) confirmação manual, ${failed} falhou(aram), ${cleaned} limpeza(s) iniciada(s).`;
 }
 
 async function saveHistory(results) {
@@ -342,6 +348,9 @@ async function saveHistory(results) {
   const entries = results.map((result) => ({
     at: new Date().toISOString(),
     senderName: result.senderName || "",
+    senderEmail: result.senderEmail || result.cleanup?.sender || "",
+    cleanupMode: result.cleanupMode || cleanupModeSelect.value || "safe",
+    unsubscribeDomain: domainFromUrl(result.urlToOpen),
     ok: Boolean(result.ok),
     message: result.message || ""
   }));
@@ -377,7 +386,7 @@ async function loadHistoryIndex() {
   const { unsubscribeHistory } = await chrome.storage.local.get({ unsubscribeHistory: [] });
   const index = new Map();
   for (const entry of unsubscribeHistory) {
-    const key = senderKey({ label: entry.senderName, detail: entry.senderName });
+    const key = senderKey({ label: entry.senderName, detail: entry.senderEmail || entry.senderName });
     if (key && !index.has(key)) index.set(key, entry);
   }
   return index;
@@ -396,6 +405,45 @@ function senderKey(item) {
 
 function selectedScanLimit() {
   return Number(scanLimitSelect.value || 25);
+}
+
+function confirmCleanupMode(items) {
+  if (cleanupModeSelect.value !== "auto") return true;
+  const senders = uniqueSenderEmails(items);
+  const preview = senders.length ? senders.slice(0, 5).join("\n") : "remetentes sem e-mail claro";
+  const extra = senders.length > 5 ? `\n...e mais ${senders.length - 5}` : "";
+  return confirm(`Modo automático vai selecionar e enviar para a lixeira os e-mails visíveis destes remetentes após o descadastro:\n\n${preview}${extra}\n\nContinuar?`);
+}
+
+function updateCleanupPreview() {
+  const selected = selectedSubscriptions();
+  const senders = uniqueSenderEmails(selected);
+  const descriptions = {
+    safe: "Modo seguro: depois do descadastro, a extensão só aplica o filtro do remetente.",
+    semi: "Modo semi: depois do descadastro, a extensão aplica o filtro e seleciona mensagens visíveis.",
+    auto: "Modo auto: depois do descadastro, a extensão aplica o filtro e envia mensagens visíveis para a lixeira.",
+    off: "Sem limpeza: a extensão só tenta o descadastro."
+  };
+  cleanupPreviewEl.textContent = `${descriptions[cleanupModeSelect.value] || descriptions.safe} Selecionadas: ${selected.length}; ${senders.length || "nenhum"} remetente(s) com e-mail.`;
+  cleanupPreviewEl.dataset.mode = cleanupModeSelect.value;
+}
+
+function uniqueSenderEmails(items) {
+  return [...new Set(items.map(senderEmailFromItem).filter(Boolean))];
+}
+
+function senderEmailFromItem(item) {
+  const value = `${item.detail || ""} ${item.label || ""}`;
+  return value.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i)?.[0] || "";
+}
+
+function domainFromUrl(value) {
+  if (!value) return "";
+  try {
+    return new URL(value).hostname;
+  } catch {
+    return "";
+  }
 }
 
 function addDebug(message) {

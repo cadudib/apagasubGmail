@@ -137,6 +137,17 @@ select {
   font-size: 12px;
 }
 
+.cleanup-preview {
+  border-left: 3px solid var(--border);
+  padding-left: 10px;
+  font-size: 12px;
+}
+
+.cleanup-preview[data-mode="auto"] {
+  border-left-color: var(--danger);
+  color: var(--danger);
+}
+
 input[type="checkbox"] {
   width: 16px;
   height: 16px;

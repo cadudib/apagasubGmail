@@ -1,6 +1,6 @@
 (() => {
-  if (globalThis.__apagaSubVersion === "1.25.0") return;
-  globalThis.__apagaSubVersion = "1.25.0";
+  if (globalThis.__apagaSubVersion === "1.26.0") return;
+  globalThis.__apagaSubVersion = "1.26.0";
 
   const TEXT_MATCH = /(unsubscribe|unsubscribe here|cancelar inscrição|cancelar inscri[cç][aã]o|cancelar assinatura|cancelar sua assinatura|cancelar subscrição|cancelar a subscri[cç][aã]o|descadastrar|descadastre|sair da lista|remover inscrição|remover inscri[cç][aã]o|gerenciar preferências|gerenciar preferencias)/i;
 
@@ -176,8 +176,15 @@
     for (const item of items) {
       debug(`Processando saída: ${item.label || item.detail || item.id}`);
       const result = await processUnsubscribeItem(item);
+      result.senderEmail = senderEmailFromItem(item);
+      result.cleanupMode = cleanupMode;
       if (result.ok && !result.urlToOpen && cleanupMode !== "off") {
-        await cleanupSenderEmails(item, cleanupMode);
+        result.cleanup = await cleanupSenderEmails(item, cleanupMode);
+      } else {
+        result.cleanup = {
+          attempted: false,
+          message: result.urlToOpen ? "Link externo aberto; limpeza não executada automaticamente." : "Limpeza desligada."
+        };
       }
       results.push(result);
       await wait(1500);
@@ -207,7 +214,7 @@
     const sender = senderEmailFromItem(item);
     if (!sender) {
       debug("Limpeza ignorada: remetente sem e-mail claro.");
-      return false;
+      return { attempted: false, sender: "", mode, message: "Remetente sem e-mail claro." };
     }
 
     debug(`Limpando e-mails do remetente (${mode}): ${sender}`);
@@ -215,17 +222,32 @@
 
     if (mode === "safe") {
       debug(`Modo seguro: filtro aplicado para ${sender}.`);
-      return true;
+      return { attempted: true, sender, mode, message: "Filtro por remetente aplicado." };
     }
 
     const selected = selectVisibleMessages();
     debug(selected ? "Mensagens visíveis selecionadas." : "Não consegui selecionar mensagens visíveis.");
 
-    if (mode === "semi") return selected;
+    if (mode === "semi") {
+      return {
+        attempted: true,
+        sender,
+        mode,
+        selected,
+        message: selected ? "Mensagens visíveis selecionadas." : "Não consegui selecionar mensagens visíveis."
+      };
+    }
 
     const deleted = selected && clickTrashButton();
     debug(deleted ? "Cliquei na lixeira para mensagens selecionadas." : "Não encontrei a lixeira.");
-    return deleted;
+    return {
+      attempted: true,
+      sender,
+      mode,
+      selected,
+      deleted,
+      message: deleted ? "Mensagens selecionadas enviadas para a lixeira." : "Não consegui enviar mensagens para a lixeira."
+    };
   }
 
   function senderEmailFromItem(item) {
