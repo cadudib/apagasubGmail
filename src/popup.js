@@ -1,7 +1,9 @@
 const scanButton = document.querySelector("#scanButton");
 const deepScanButton = document.querySelector("#deepScanButton");
 const filterSenderButton = document.querySelector("#filterSenderButton");
+const testPaginationButton = document.querySelector("#testPaginationButton");
 const simulateDeleteSenderButton = document.querySelector("#simulateDeleteSenderButton");
+const deleteCurrentPageButton = document.querySelector("#deleteCurrentPageButton");
 const deleteSenderButton = document.querySelector("#deleteSenderButton");
 const deleteDomainButton = document.querySelector("#deleteDomainButton");
 const nextPageButton = document.querySelector("#nextPageButton");
@@ -159,6 +161,14 @@ deleteSenderButton.addEventListener("click", async () => {
   });
 });
 
+deleteCurrentPageButton.addEventListener("click", async () => {
+  await runAction("Pegando remetente para apagar página atual...", async () => {
+    const response = await sendToGmail({ type: "getCurrentSenderGmail" });
+    const sender = response.sender;
+    await runSenderCleanup(sender, { simulate: false, pageLimitOverride: 1 });
+  });
+});
+
 deleteDomainButton.addEventListener("click", async () => {
   await runAction("Pegando domínio para apagar...", async () => {
     const response = await sendToGmail({ type: "getCurrentSenderGmail" });
@@ -172,6 +182,14 @@ simulateDeleteSenderButton.addEventListener("click", async () => {
     const response = await sendToGmail({ type: "getCurrentSenderGmail" });
     const sender = response.sender;
     await runSenderCleanup(sender, { simulate: true });
+  });
+});
+
+testPaginationButton.addEventListener("click", async () => {
+  await runAction("Testando paginação do remetente...", async () => {
+    const response = await sendToGmail({ type: "getCurrentSenderGmail" });
+    const sender = response.sender;
+    await runSenderCleanup(sender, { simulate: true, paginationOnly: true });
   });
 });
 
@@ -272,7 +290,7 @@ async function runAction(message, action) {
   }
 }
 
-async function runSenderCleanup(sender, { simulate, byDomain = false }) {
+async function runSenderCleanup(sender, { simulate, byDomain = false, paginationOnly = false, pageLimitOverride = null }) {
   if (!sender?.email) {
     throw new Error("Abra um e-mail com remetente visível para limpar automaticamente por endereço.");
   }
@@ -286,9 +304,11 @@ async function runSenderCleanup(sender, { simulate, byDomain = false }) {
   if (byDomain && !domain) {
     throw new Error("Não consegui identificar o domínio do remetente.");
   }
+  const pageLimit = pageLimitOverride ?? selectedCleanupPageLimit();
+  const limitText = pageLimit === 0 ? "até acabar" : `${pageLimit} página(s)`;
   const confirmText = byDomain
     ? `ATENÇÃO: isso vai buscar e enviar para a lixeira mensagens visíveis do domínio inteiro:\n\n${domain}\n\nContinuar?`
-    : `Filtrar e enviar para a lixeira os e-mails visíveis de:\n\n${sender.email}\n\nContinuar?`;
+    : `Filtrar e enviar para a lixeira os e-mails visíveis de:\n\n${sender.email}\n\nLimite: ${limitText}\n\nContinuar?`;
   if (!simulate && !confirm(confirmText)) {
     setStatus("Ação cancelada.");
     return;
@@ -298,8 +318,8 @@ async function runSenderCleanup(sender, { simulate, byDomain = false }) {
   await openGmailSearch(query);
   await wait(4000);
 
-  setStatus(simulate ? `Contando mensagens visíveis de ${target}...` : `Selecionando e apagando e-mails de ${target}...`);
-  const cleanupResponse = await sendToGmail({ type: "cleanupVisibleGmail", mode: simulate ? "simulate" : "auto", sender: target, pageLimit: selectedCleanupPageLimit() });
+  setStatus(simulate ? `Contando paginação de ${target}...` : `Selecionando e apagando e-mails de ${target}...`);
+  const cleanupResponse = await sendToGmail({ type: "cleanupVisibleGmail", mode: simulate ? "simulate" : "auto", sender: target, pageLimit, paginationOnly });
   const cleanup = cleanupResponse.cleanup;
   subscriptions = [];
   renderSubscriptions();
@@ -493,7 +513,9 @@ function setBusy(busy) {
   scanButton.disabled = busy;
   deepScanButton.disabled = busy;
   filterSenderButton.disabled = busy;
+  testPaginationButton.disabled = busy;
   simulateDeleteSenderButton.disabled = busy;
+  deleteCurrentPageButton.disabled = busy;
   deleteSenderButton.disabled = busy;
   deleteDomainButton.disabled = busy;
   nextPageButton.disabled = busy;
@@ -536,7 +558,7 @@ function setRunSummary(results) {
 function setCleanupSummary(cleanup) {
   if (!cleanup) return;
   if (cleanup.simulated) {
-    summaryTextEl.textContent = `Simulação: ${cleanup.visibleCount || 0} mensagem(ns) visível(is), próxima página: ${cleanup.hasNextPage ? "sim" : "não"}.`;
+    summaryTextEl.textContent = `Simulação: ${cleanup.visibleCount || 0} mensagem(ns), ${cleanup.pagesSeen || 1} página(s), próxima página: ${cleanup.hasNextPage ? "sim" : "não"}.`;
     return;
   }
   summaryTextEl.textContent = `Limpeza: ${cleanup.pagesDeleted || 0} página(s) apagada(s), selecionou: ${cleanup.selected ? "sim" : "não"}, apagou: ${cleanup.deleted ? "sim" : "não"}${cleanup.stopped ? ", parada solicitada" : ""}.`;

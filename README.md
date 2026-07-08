@@ -22,7 +22,7 @@ Ela nao pede senha, nao usa OAuth e nao exige Google Cloud. A extensao trabalha 
 
 1. Baixe a versao mais recente:
 
-   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.37.zip`
+   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.38.zip`
 
 2. Extraia o arquivo ZIP.
 
@@ -142,9 +142,17 @@ scripts/package.sh
 
 ## Versao atual
 
-V1.37
+V1.38
 
 ## Changelog
+
+### V1.38
+
+- Adiciona `Testar paginação` sem apagar mensagens.
+- Torna `Simular apagar` paginado para estimar páginas e mensagens antes da exclusão.
+- Adiciona confirmação com faixa/limite de páginas antes de apagar.
+- Adiciona `Apagar pág. atual` para executar limpeza limitada a uma página.
+- Registra no debug o relatório de paginação página por página.
 
 ### V1.37
 
