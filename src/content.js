@@ -1,6 +1,6 @@
 (() => {
-  if (globalThis.__apagaSubVersion === "1.32.0") return;
-  globalThis.__apagaSubVersion = "1.32.0";
+  if (globalThis.__apagaSubVersion === "1.33.0") return;
+  globalThis.__apagaSubVersion = "1.33.0";
 
   const TEXT_MATCH = /(unsubscribe|unsubscribe here|cancelar inscrição|cancelar inscri[cç][aã]o|cancelar assinatura|cancelar sua assinatura|cancelar subscrição|cancelar a subscri[cç][aã]o|descadastrar|descadastre|sair da lista|remover inscrição|remover inscri[cç][aã]o|gerenciar preferências|gerenciar preferencias)/i;
 
@@ -236,7 +236,7 @@
       return { attempted: true, sender, mode, message: "Filtro por remetente aplicado." };
     }
 
-    const selected = selectVisibleMessages();
+    const selected = await selectVisibleMessages();
     debug(selected ? "Mensagens visíveis selecionadas." : "Não consegui selecionar mensagens visíveis.");
     if (selected) await wait(1200);
 
@@ -268,7 +268,7 @@
     return value.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i)?.[0] || "";
   }
 
-  function selectVisibleMessages() {
+  async function selectVisibleMessages() {
     const firstRow = visibleMessageRows()[0]?.element;
     const rowTop = firstRow?.getBoundingClientRect().top || 260;
     const selectBox = [...document.querySelectorAll('[aria-label="Select"], [aria-label="Selecionar"], [data-tooltip="Select"], [data-tooltip="Selecionar"], div[role="checkbox"][aria-checked="false"]')]
@@ -279,20 +279,51 @@
       })[0];
     if (!selectBox) return false;
     activateElement(selectBox);
-    return true;
+    await wait(700);
+
+    const choseAll = await chooseAllFromSelectionMenu();
+    if (choseAll) {
+      debug("Opção Todos selecionada no menu do Gmail.");
+      await wait(900);
+    }
+
+    return Boolean(findToolbarTrashButton()) || choseAll;
   }
 
   function clickTrashButton() {
-    const trashButton = [...document.querySelectorAll("[aria-label], [data-tooltip], [role='button'], div[role='button']")]
+    const trashButton = findToolbarTrashButton();
+    if (!trashButton) return false;
+    activateElement(trashButton);
+    return true;
+  }
+
+  function findToolbarTrashButton() {
+    return [...document.querySelectorAll("[aria-label], [data-tooltip], [role='button'], div[role='button']")]
       .filter(isVisible)
       .filter(isToolbarControl)
       .find((element) => {
         const text = controlLabelText(element);
         return /^(delete|trash|excluir|mover para a lixeira|move to trash)$/i.test(text) || /delete|mover para a lixeira|move to trash/i.test(text);
-      });
-    if (!trashButton) return false;
-    activateElement(trashButton);
+      }) || null;
+  }
+
+  async function chooseAllFromSelectionMenu() {
+    const found = await waitFor(() => visibleSelectionAllItems().length > 0, 1500);
+    if (!found) return false;
+    const item = visibleSelectionAllItems()[0];
+    activateElement(item);
     return true;
+  }
+
+  function visibleSelectionAllItems() {
+    return [...document.querySelectorAll("[role='menuitem'], [role='option'], .J-N, .goog-menuitem, [tabindex]")]
+      .filter(isVisible)
+      .filter((element) => {
+        const rect = element.getBoundingClientRect();
+        if (rect.width > 360 || rect.height > 80) return false;
+        const text = elementSearchText(element);
+        return /^(todos|all)$/i.test(text) || /^selecionar todos$/i.test(text);
+      });
   }
 
   function controlLabelText(element) {

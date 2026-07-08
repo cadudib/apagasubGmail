@@ -22,7 +22,7 @@ Ela nao pede senha, nao usa OAuth e nao exige Google Cloud. A extensao trabalha 
 
 1. Baixe a versao mais recente:
 
-   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.32.zip`
+   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.33.zip`
 
 2. Extraia o arquivo ZIP.
 
@@ -142,9 +142,14 @@ scripts/package.sh
 
 ## Versao atual
 
-V1.32
+V1.33
 
 ## Changelog
+
+### V1.33
+
+- Se o seletor superior do Gmail abrir o menu da seta, escolhe `Todos`/`All` antes de tentar excluir.
+- Só continua para exclusão quando encontra o botão de lixeira na barra de ações.
 
 ### V1.32
 
