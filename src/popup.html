@@ -10,7 +10,7 @@
     <main class="shell">
       <header class="topbar">
         <div>
-          <h1>Apaga Sub V1.36</h1>
+          <h1>Apaga Sub V1.37</h1>
           <p id="status">Escolha um termo pronto para preencher a busca do Gmail.</p>
         </div>
       </header>
@@ -28,6 +28,7 @@
           <button id="filterSenderButton" type="button">Filtrar remetente</button>
           <button id="simulateDeleteSenderButton" type="button">Simular apagar</button>
           <button id="deleteSenderButton" type="button">Filtrar e apagar</button>
+          <button id="deleteDomainButton" type="button">Apagar domínio</button>
           <button id="scanButton" type="button">Ver linhas</button>
           <button id="deepScanButton" type="button">Varrer página</button>
         </div>
@@ -50,6 +51,17 @@
           </select>
           <span class="option-note">Usa from:remetente</span>
         </div>
+        <div class="scan-options">
+          <label for="cleanupPageLimit">Limite</label>
+          <select id="cleanupPageLimit">
+            <option value="1">1 página</option>
+            <option value="5">5 páginas</option>
+            <option value="10">10 páginas</option>
+            <option value="20" selected>20 páginas</option>
+            <option value="0">Até acabar</option>
+          </select>
+          <span class="option-note">Por remetente/domínio</span>
+        </div>
         <p id="cleanupPreview" class="cleanup-preview">Modo seguro: depois do descadastro, a extensão só aplica o filtro do remetente.</p>
       </section>
 
@@ -69,10 +81,16 @@
         <p id="summaryText">Nenhuma execução nesta sessão.</p>
       </section>
 
+      <section class="summary-panel">
+        <strong>Histórico</strong>
+        <ul id="historyLog" class="history-log"></ul>
+      </section>
+
       <section class="debug-panel">
         <div class="debug-header">
           <strong>Debug</strong>
           <span>
+            <button id="exportLogButton" type="button">Exportar</button>
             <button id="copyDebugButton" type="button">Copiar</button>
             <button id="clearDebugButton" type="button">Limpar</button>
           </span>

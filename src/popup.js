@@ -3,9 +3,11 @@ const deepScanButton = document.querySelector("#deepScanButton");
 const filterSenderButton = document.querySelector("#filterSenderButton");
 const simulateDeleteSenderButton = document.querySelector("#simulateDeleteSenderButton");
 const deleteSenderButton = document.querySelector("#deleteSenderButton");
+const deleteDomainButton = document.querySelector("#deleteDomainButton");
 const nextPageButton = document.querySelector("#nextPageButton");
 const scanLimitSelect = document.querySelector("#scanLimit");
 const cleanupModeSelect = document.querySelector("#cleanupMode");
+const cleanupPageLimitSelect = document.querySelector("#cleanupPageLimit");
 const unsubscribeButton = document.querySelector("#unsubscribeButton");
 const stopActionButton = document.querySelector("#stopActionButton");
 const statusEl = document.querySelector("#status");
@@ -13,8 +15,10 @@ const resultsEl = document.querySelector("#results");
 const summaryTextEl = document.querySelector("#summaryText");
 const cleanupPreviewEl = document.querySelector("#cleanupPreview");
 const debugLogEl = document.querySelector("#debugLog");
+const historyLogEl = document.querySelector("#historyLog");
 const clearDebugButton = document.querySelector("#clearDebugButton");
 const copyDebugButton = document.querySelector("#copyDebugButton");
+const exportLogButton = document.querySelector("#exportLogButton");
 const selectAll = document.querySelector("#selectAll");
 const template = document.querySelector("#subscriptionTemplate");
 const presetButtons = document.querySelectorAll(".preset-button");
@@ -39,6 +43,8 @@ const BLOCKED_DOMAINS = [
   "nubank.com.br",
   "mercadopago.com.br"
 ];
+
+renderHistory();
 
 chrome.runtime.onMessage.addListener((message) => {
   if (message?.type === "debugEvent") {
@@ -94,6 +100,25 @@ copyDebugButton.addEventListener("click", async () => {
   setStatus("Debug copiado para a área de transferência.");
 });
 
+exportLogButton.addEventListener("click", async () => {
+  const history = [...historyLogEl.children].map((item) => item.textContent).join("\n") || "Sem histórico nesta instalação.";
+  const debug = [...debugLogEl.children].map((item) => item.textContent).join("\n") || "Sem debug nesta sessão.";
+  const report = [
+    `Apaga Sub ${new Date().toISOString()}`,
+    "",
+    `Resumo: ${summaryTextEl.textContent}`,
+    `Status: ${statusEl.textContent}`,
+    "",
+    "Histórico:",
+    history,
+    "",
+    "Debug:",
+    debug
+  ].join("\n");
+  await navigator.clipboard.writeText(report);
+  setStatus("Log exportado para a área de transferência.");
+});
+
 stopActionButton.addEventListener("click", async () => {
   await chrome.storage.local.set({ cleanupStopRequested: true });
   stopActionButton.disabled = true;
@@ -131,6 +156,14 @@ deleteSenderButton.addEventListener("click", async () => {
     const response = await sendToGmail({ type: "getCurrentSenderGmail" });
     const sender = response.sender;
     await runSenderCleanup(sender, { simulate: false });
+  });
+});
+
+deleteDomainButton.addEventListener("click", async () => {
+  await runAction("Pegando domínio para apagar...", async () => {
+    const response = await sendToGmail({ type: "getCurrentSenderGmail" });
+    const sender = response.sender;
+    await runSenderCleanup(sender, { simulate: false, byDomain: true });
   });
 });
 
@@ -239,31 +272,41 @@ async function runAction(message, action) {
   }
 }
 
-async function runSenderCleanup(sender, { simulate }) {
+async function runSenderCleanup(sender, { simulate, byDomain = false }) {
   if (!sender?.email) {
     throw new Error("Abra um e-mail com remetente visível para limpar automaticamente por endereço.");
   }
-  const blocked = !simulate ? blockedSenderReason(sender.email) : "";
+  const domain = emailDomain(sender.email);
+  const target = byDomain ? domain : sender.email;
+  const query = byDomain ? `from:(${domain})` : `from:${sender.email}`;
+  const blocked = !simulate ? blockedSenderReason(target) : "";
   if (blocked) {
     throw new Error(`Remetente bloqueado por segurança: ${blocked}. Use o Gmail manualmente para esse caso.`);
   }
-  if (!simulate && !confirm(`Filtrar e enviar para a lixeira os e-mails visíveis de:\n\n${sender.email}\n\nContinuar?`)) {
+  if (byDomain && !domain) {
+    throw new Error("Não consegui identificar o domínio do remetente.");
+  }
+  const confirmText = byDomain
+    ? `ATENÇÃO: isso vai buscar e enviar para a lixeira mensagens visíveis do domínio inteiro:\n\n${domain}\n\nContinuar?`
+    : `Filtrar e enviar para a lixeira os e-mails visíveis de:\n\n${sender.email}\n\nContinuar?`;
+  if (!simulate && !confirm(confirmText)) {
     setStatus("Ação cancelada.");
     return;
   }
 
-  const query = `from:${sender.email}`;
-  setStatus(`${simulate ? "Simulando" : "Filtrando"} ${sender.email}...`);
+  setStatus(`${simulate ? "Simulando" : "Filtrando"} ${target}...`);
   await openGmailSearch(query);
   await wait(4000);
 
-  setStatus(simulate ? `Contando mensagens visíveis de ${sender.email}...` : `Selecionando e apagando e-mails de ${sender.email}...`);
-  const cleanupResponse = await sendToGmail({ type: "cleanupVisibleGmail", mode: simulate ? "simulate" : "auto", sender: sender.email });
+  setStatus(simulate ? `Contando mensagens visíveis de ${target}...` : `Selecionando e apagando e-mails de ${target}...`);
+  const cleanupResponse = await sendToGmail({ type: "cleanupVisibleGmail", mode: simulate ? "simulate" : "auto", sender: target, pageLimit: selectedCleanupPageLimit() });
   const cleanup = cleanupResponse.cleanup;
   subscriptions = [];
   renderSubscriptions();
   setCleanupSummary(cleanup);
-  setStatus(cleanup?.message || `Limpeza concluída para ${sender.email}.`, cleanup?.deleted || cleanup?.simulated ? "normal" : "error");
+  await saveCleanupHistory({ target, query, byDomain, cleanup });
+  await renderHistory();
+  setStatus(cleanup?.message || `Limpeza concluída para ${target}.`, cleanup?.deleted || cleanup?.simulated ? "normal" : "error");
 }
 
 function renderSubscriptions() {
@@ -406,9 +449,10 @@ async function cleanupAfterUnsubscribe(results) {
     await wait(4000);
 
     try {
-      const response = await sendToGmail({ type: "cleanupVisibleGmail", mode, sender });
+      const response = await sendToGmail({ type: "cleanupVisibleGmail", mode, sender, pageLimit: selectedCleanupPageLimit() });
       result.cleanup = response.cleanup || { attempted: false, sender, mode, message: "Limpeza sem resposta detalhada." };
       setCleanupSummary(result.cleanup);
+      await saveCleanupHistory({ target: sender, query: `from:${sender}`, byDomain: false, cleanup: result.cleanup });
     } catch (error) {
       result.cleanup = { attempted: false, sender, mode, message: `Falha na limpeza: ${error.message}` };
       addDebug(result.cleanup.message);
@@ -451,9 +495,11 @@ function setBusy(busy) {
   filterSenderButton.disabled = busy;
   simulateDeleteSenderButton.disabled = busy;
   deleteSenderButton.disabled = busy;
+  deleteDomainButton.disabled = busy;
   nextPageButton.disabled = busy;
   scanLimitSelect.disabled = busy;
   cleanupModeSelect.disabled = busy;
+  cleanupPageLimitSelect.disabled = busy;
   stopActionButton.disabled = !busy;
   presetButtons.forEach((button) => {
     button.disabled = busy;
@@ -511,6 +557,46 @@ async function saveHistory(results) {
   await chrome.storage.local.set({ unsubscribeHistory });
 }
 
+async function saveCleanupHistory({ target, query, byDomain, cleanup }) {
+  if (!cleanup) return;
+  const current = await chrome.storage.local.get({ cleanupHistory: [] });
+  const entry = {
+    at: new Date().toISOString(),
+    target,
+    query,
+    type: byDomain ? "domínio" : "remetente",
+    mode: cleanup.mode || "auto",
+    simulated: Boolean(cleanup.simulated),
+    pagesDeleted: Number(cleanup.pagesDeleted || 0),
+    visibleCount: Number(cleanup.visibleCount || 0),
+    deleted: Boolean(cleanup.deleted),
+    stopped: Boolean(cleanup.stopped),
+    message: cleanup.message || ""
+  };
+  const cleanupHistory = [entry, ...current.cleanupHistory].slice(0, 30);
+  await chrome.storage.local.set({ cleanupHistory });
+}
+
+async function renderHistory() {
+  if (!historyLogEl) return;
+  const { cleanupHistory } = await chrome.storage.local.get({ cleanupHistory: [] });
+  historyLogEl.innerHTML = "";
+  const entries = cleanupHistory.slice(0, 6);
+  if (!entries.length) {
+    const item = document.createElement("li");
+    item.textContent = "Nenhuma limpeza registrada.";
+    historyLogEl.appendChild(item);
+    return;
+  }
+  for (const entry of entries) {
+    const item = document.createElement("li");
+    const date = new Date(entry.at).toLocaleString();
+    const action = entry.simulated ? "simulação" : entry.deleted ? "apagou" : "falhou";
+    item.textContent = `${date}: ${entry.type} ${entry.target} - ${action}, ${entry.pagesDeleted || 0} pág. ${entry.stopped ? "(parado)" : ""}`;
+    historyLogEl.appendChild(item);
+  }
+}
+
 async function prepareSubscriptions(items) {
   const history = await loadHistoryIndex();
   const deduped = [];
@@ -558,6 +644,10 @@ function senderKey(item) {
 
 function selectedScanLimit() {
   return Number(scanLimitSelect.value || 25);
+}
+
+function selectedCleanupPageLimit() {
+  return Number(cleanupPageLimitSelect.value || 20);
 }
 
 function confirmCleanupMode(items) {

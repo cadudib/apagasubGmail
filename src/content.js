@@ -1,6 +1,6 @@
 (() => {
-  if (globalThis.__apagaSubVersion === "1.36.0") return;
-  globalThis.__apagaSubVersion = "1.36.0";
+  if (globalThis.__apagaSubVersion === "1.37.0") return;
+  globalThis.__apagaSubVersion = "1.37.0";
 
   const TEXT_MATCH = /(unsubscribe|unsubscribe here|cancelar inscrição|cancelar inscri[cç][aã]o|cancelar assinatura|cancelar sua assinatura|cancelar subscrição|cancelar a subscri[cç][aã]o|descadastrar|descadastre|sair da lista|remover inscrição|remover inscri[cç][aã]o|gerenciar preferências|gerenciar preferencias)/i;
 
@@ -28,7 +28,7 @@
     if (message?.type === "scanPageGmail") return { ok: true, items: await scanPageGmail(message.limit || 25) };
     if (message?.type === "goNextPageGmail") return { ok: true, moved: goNextPageGmail() };
     if (message?.type === "unsubscribeVisibleGmail") return { ok: true, results: await unsubscribeItems(message.items || [], message.cleanupMode || "safe") };
-    if (message?.type === "cleanupVisibleGmail") return { ok: true, cleanup: await cleanupVisibleMessages(message.mode || "safe", message.sender || "") };
+    if (message?.type === "cleanupVisibleGmail") return { ok: true, cleanup: await cleanupVisibleMessages(message.mode || "safe", message.sender || "", message.pageLimit) };
     return { ok: false, error: "Ação desconhecida." };
   }
 
@@ -222,7 +222,7 @@
     return { id: item.id, senderName: item.label, ok: false, message: "Use Varrer página para procurar o botão de descadastro." };
   }
 
-  async function cleanupVisibleMessages(mode, sender) {
+  async function cleanupVisibleMessages(mode, sender, pageLimit) {
     mode = normalizeCleanupMode(mode);
     if (!sender) {
       debug("Limpeza ignorada: remetente sem e-mail claro.");
@@ -279,7 +279,8 @@
     let pagesDeleted = 0;
     let stoppedBecauseListDidNotChange = false;
     let stopped = false;
-    const maxPages = 20;
+    const maxPages = normalizePageLimit(pageLimit);
+    progress(`Limite desta limpeza: ${maxPages === 100 ? "até acabar" : `${maxPages} página(s)`}.`);
 
     for (let page = 1; page <= maxPages; page += 1) {
       if (await shouldStopCleanup()) {
@@ -309,8 +310,12 @@
         break;
       }
 
-      if (visibleMessageRows().length > 0) continue;
+      if (visibleMessageRows().length > 0) {
+        progress(`Página ${page}: ainda há mensagens visíveis; repetindo seleção nesta página.`);
+        continue;
+      }
 
+      progress(`Página ${page}: verificando próxima página.`);
       const moved = goNextPageGmail();
       progress(moved ? "Avançando para próxima página do remetente." : "Fim das páginas para este remetente.");
       if (!moved) break;
@@ -333,9 +338,18 @@
           ? `${pagesDeleted} página(s) enviada(s) para a lixeira; parada solicitada.`
           : stoppedBecauseListDidNotChange
           ? `${pagesDeleted} página(s) enviada(s) para a lixeira; parei porque a lista não mudou depois do clique.`
+          : pagesDeleted >= maxPages
+          ? `${pagesDeleted} página(s) enviada(s) para a lixeira; limite atingido.`
           : `${pagesDeleted} página(s) enviada(s) para a lixeira.`
         : "Não consegui enviar mensagens para a lixeira."
     };
+  }
+
+  function normalizePageLimit(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric < 0) return 20;
+    if (numeric === 0) return 100;
+    return Math.max(1, Math.min(100, Math.floor(numeric)));
   }
 
   function senderEmailFromItem(item) {

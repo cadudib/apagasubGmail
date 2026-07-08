@@ -54,6 +54,7 @@ button:disabled {
 #filterSenderButton,
 #simulateDeleteSenderButton,
 #deleteSenderButton,
+#deleteDomainButton,
 #nextPageButton,
 #unsubscribeButton {
   border-color: var(--primary);
@@ -66,6 +67,7 @@ button:disabled {
 #filterSenderButton:hover,
 #simulateDeleteSenderButton:hover,
 #deleteSenderButton:hover,
+#deleteDomainButton:hover,
 #nextPageButton:hover,
 #unsubscribeButton:hover {
   background: var(--primary-hover);
@@ -315,5 +317,19 @@ input[type="checkbox"] {
 }
 
 .debug-log li {
+  overflow-wrap: anywhere;
+}
+
+.history-log {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.history-log li {
   overflow-wrap: anywhere;
 }
