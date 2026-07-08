@@ -1,6 +1,6 @@
 (() => {
-  if (globalThis.__apagaSubVersion === "1.38.0") return;
-  globalThis.__apagaSubVersion = "1.38.0";
+  if (globalThis.__apagaSubVersion === "1.39.0") return;
+  globalThis.__apagaSubVersion = "1.39.0";
 
   const TEXT_MATCH = /(unsubscribe|unsubscribe here|cancelar inscrição|cancelar inscri[cç][aã]o|cancelar assinatura|cancelar sua assinatura|cancelar subscrição|cancelar a subscri[cç][aã]o|descadastrar|descadastre|sair da lista|remover inscrição|remover inscri[cç][aã]o|gerenciar preferências|gerenciar preferencias)/i;
 
@@ -307,12 +307,14 @@
     let pagesDeleted = 0;
     let stoppedBecauseListDidNotChange = false;
     let stopped = false;
+    let stopReason = "";
     const maxPages = normalizePageLimit(pageLimit);
     progress(`Limite desta limpeza: ${maxPages === 100 ? "até acabar" : `${maxPages} página(s)`}.`);
 
     for (let page = 1; page <= maxPages; page += 1) {
       if (await shouldStopCleanup()) {
         stopped = true;
+        stopReason = "parada solicitada";
         progress("Limpeza interrompida antes da próxima página.");
         break;
       }
@@ -334,6 +336,7 @@
       const changed = await waitFor(() => visibleRowsSnapshot() !== beforeKey, 7000);
       if (!changed && visibleMessageRows().length > 0) {
         stoppedBecauseListDidNotChange = true;
+        stopReason = "lista não mudou após clique na lixeira";
         debug("Limpeza interrompida: cliquei na lixeira, mas a lista visível não mudou.");
         break;
       }
@@ -361,6 +364,7 @@
       deleted,
       pagesDeleted,
       stopped,
+      stopReason,
       message: deleted
         ? stopped
           ? `${pagesDeleted} página(s) enviada(s) para a lixeira; parada solicitada.`

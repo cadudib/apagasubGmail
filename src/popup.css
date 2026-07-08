@@ -308,6 +308,33 @@ input[type="checkbox"] {
   font-size: 12px;
 }
 
+#batchSimulateButton,
+#batchDeleteButton,
+#openTrashButton,
+#saveSettingsButton {
+  min-height: 30px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.settings-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-panel label {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  resize: vertical;
+}
+
 .debug-log {
   display: grid;
   gap: 4px;

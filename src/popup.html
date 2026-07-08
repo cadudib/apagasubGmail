@@ -10,7 +10,7 @@
     <main class="shell">
       <header class="topbar">
         <div>
-          <h1>Apaga Sub V1.38</h1>
+          <h1>Apaga Sub V1.39</h1>
           <p id="status">Escolha um termo pronto para preencher a busca do Gmail.</p>
         </div>
       </header>
@@ -73,6 +73,8 @@
           <span>Selecionar tudo</span>
         </label>
         <button id="stopActionButton" type="button" disabled>Parar</button>
+        <button id="batchSimulateButton" type="button" disabled>Simular lote</button>
+        <button id="batchDeleteButton" type="button" disabled>Apagar lote</button>
         <button id="unsubscribeButton" type="button" disabled>Sair das selecionadas</button>
       </section>
 
@@ -85,7 +87,15 @@
 
       <section class="summary-panel">
         <strong>Histórico</strong>
+        <button id="openTrashButton" type="button">Abrir lixeira filtrada</button>
         <ul id="historyLog" class="history-log"></ul>
+      </section>
+
+      <section class="summary-panel settings-panel">
+        <strong>Configurações</strong>
+        <label for="blockedDomainsInput">Domínios bloqueados</label>
+        <textarea id="blockedDomainsInput" rows="4"></textarea>
+        <button id="saveSettingsButton" type="button">Salvar configurações</button>
       </section>
 
       <section class="debug-panel">

@@ -12,6 +12,8 @@ const cleanupModeSelect = document.querySelector("#cleanupMode");
 const cleanupPageLimitSelect = document.querySelector("#cleanupPageLimit");
 const unsubscribeButton = document.querySelector("#unsubscribeButton");
 const stopActionButton = document.querySelector("#stopActionButton");
+const batchSimulateButton = document.querySelector("#batchSimulateButton");
+const batchDeleteButton = document.querySelector("#batchDeleteButton");
 const statusEl = document.querySelector("#status");
 const resultsEl = document.querySelector("#results");
 const summaryTextEl = document.querySelector("#summaryText");
@@ -21,14 +23,18 @@ const historyLogEl = document.querySelector("#historyLog");
 const clearDebugButton = document.querySelector("#clearDebugButton");
 const copyDebugButton = document.querySelector("#copyDebugButton");
 const exportLogButton = document.querySelector("#exportLogButton");
+const openTrashButton = document.querySelector("#openTrashButton");
+const blockedDomainsInput = document.querySelector("#blockedDomainsInput");
+const saveSettingsButton = document.querySelector("#saveSettingsButton");
 const selectAll = document.querySelector("#selectAll");
 const template = document.querySelector("#subscriptionTemplate");
 const presetButtons = document.querySelectorAll(".preset-button");
 
 let subscriptions = [];
 let busy = false;
+let blockedDomains = [];
 
-const BLOCKED_DOMAINS = [
+const DEFAULT_BLOCKED_DOMAINS = [
   "google.com",
   "accounts.google.com",
   "apple.com",
@@ -46,6 +52,8 @@ const BLOCKED_DOMAINS = [
   "mercadopago.com.br"
 ];
 
+blockedDomains = [...DEFAULT_BLOCKED_DOMAINS];
+loadSettings();
 renderHistory();
 
 chrome.runtime.onMessage.addListener((message) => {
@@ -125,6 +133,25 @@ stopActionButton.addEventListener("click", async () => {
   await chrome.storage.local.set({ cleanupStopRequested: true });
   stopActionButton.disabled = true;
   setStatus("Parada solicitada. Aguarde a etapa atual terminar...");
+});
+
+saveSettingsButton.addEventListener("click", async () => {
+  blockedDomains = normalizeBlockedDomains(blockedDomainsInput.value.split(/\s+/));
+  await chrome.storage.local.set({ blockedDomains });
+  blockedDomainsInput.value = blockedDomains.join("\n");
+  setStatus("Configurações salvas.");
+});
+
+openTrashButton.addEventListener("click", async () => {
+  const { cleanupHistory } = await chrome.storage.local.get({ cleanupHistory: [] });
+  const last = cleanupHistory[0];
+  if (!last?.target) {
+    setStatus("Nenhuma limpeza no histórico para abrir na lixeira.", "error");
+    return;
+  }
+  const query = last.type === "domínio" ? `in:trash from:(${last.target})` : `in:trash from:${last.target}`;
+  await openGmailSearch(query);
+  setStatus(`Lixeira filtrada: ${query}`);
 });
 
 nextPageButton.addEventListener("click", async () => {
@@ -219,6 +246,14 @@ selectAll.addEventListener("change", () => {
 });
 
 cleanupModeSelect.addEventListener("change", syncActions);
+
+batchSimulateButton.addEventListener("click", async () => {
+  await runBatchCleanup({ simulate: true });
+});
+
+batchDeleteButton.addEventListener("click", async () => {
+  await runBatchCleanup({ simulate: false });
+});
 
 async function openGmailSearch(query) {
   for (let attempt = 1; attempt <= 2; attempt += 1) {
@@ -327,6 +362,33 @@ async function runSenderCleanup(sender, { simulate, byDomain = false, pagination
   await saveCleanupHistory({ target, query, byDomain, cleanup });
   await renderHistory();
   setStatus(cleanup?.message || `Limpeza concluída para ${target}.`, cleanup?.deleted || cleanup?.simulated ? "normal" : "error");
+}
+
+async function runBatchCleanup({ simulate }) {
+  const senders = uniqueSenderEmails(selectedSubscriptions());
+  if (!senders.length) {
+    setStatus("Selecione itens com e-mail de remetente para executar lote.", "error");
+    return;
+  }
+  const blocked = !simulate ? senders.map(blockedSenderReason).filter(Boolean) : [];
+  const runnable = !simulate ? senders.filter((sender) => !blockedSenderReason(sender)) : senders;
+  if (blocked.length) addDebug(`Lote ignorou bloqueados: ${blocked.join(" | ")}`);
+  if (!runnable.length) {
+    setStatus("Todos os remetentes selecionados estão bloqueados por segurança.", "error");
+    return;
+  }
+  const limit = selectedCleanupPageLimit();
+  const limitText = limit === 0 ? "até acabar" : `${limit} página(s)`;
+  if (!simulate && !confirm(`Executar apagar lote para ${runnable.length} remetente(s)?\n\nLimite por remetente: ${limitText}\n\nContinuar?`)) return;
+
+  await runAction(simulate ? "Simulando lote..." : "Apagando lote...", async () => {
+    for (const [index, email] of runnable.entries()) {
+      setStatus(`${simulate ? "Simulando" : "Apagando"} ${index + 1}/${runnable.length}: ${email}`);
+      await runSenderCleanup({ email }, { simulate });
+      if (await stopRequested()) break;
+    }
+    setStatus(simulate ? "Simulação em lote concluída." : "Limpeza em lote concluída.");
+  });
 }
 
 function renderSubscriptions() {
@@ -504,29 +566,34 @@ function selectedSubscriptions() {
 }
 
 function syncActions() {
-  unsubscribeButton.disabled = selectedSubscriptions().length === 0;
+  const selected = selectedSubscriptions();
+  unsubscribeButton.disabled = selected.length === 0;
+  batchSimulateButton.disabled = busy || selected.length === 0;
+  batchDeleteButton.disabled = busy || selected.length === 0;
   updateCleanupPreview();
 }
 
-function setBusy(busy) {
-  window.busy = busy;
-  scanButton.disabled = busy;
-  deepScanButton.disabled = busy;
-  filterSenderButton.disabled = busy;
-  testPaginationButton.disabled = busy;
-  simulateDeleteSenderButton.disabled = busy;
-  deleteCurrentPageButton.disabled = busy;
-  deleteSenderButton.disabled = busy;
-  deleteDomainButton.disabled = busy;
-  nextPageButton.disabled = busy;
-  scanLimitSelect.disabled = busy;
-  cleanupModeSelect.disabled = busy;
-  cleanupPageLimitSelect.disabled = busy;
-  stopActionButton.disabled = !busy;
+function setBusy(isBusy) {
+  busy = isBusy;
+  scanButton.disabled = isBusy;
+  deepScanButton.disabled = isBusy;
+  filterSenderButton.disabled = isBusy;
+  testPaginationButton.disabled = isBusy;
+  simulateDeleteSenderButton.disabled = isBusy;
+  deleteCurrentPageButton.disabled = isBusy;
+  deleteSenderButton.disabled = isBusy;
+  deleteDomainButton.disabled = isBusy;
+  nextPageButton.disabled = isBusy;
+  scanLimitSelect.disabled = isBusy;
+  cleanupModeSelect.disabled = isBusy;
+  cleanupPageLimitSelect.disabled = isBusy;
+  stopActionButton.disabled = !isBusy;
+  batchSimulateButton.disabled = isBusy || selectedSubscriptions().length === 0;
+  batchDeleteButton.disabled = isBusy || selectedSubscriptions().length === 0;
   presetButtons.forEach((button) => {
-    button.disabled = busy;
+    button.disabled = isBusy;
   });
-  unsubscribeButton.disabled = busy || selectedSubscriptions().length === 0;
+  unsubscribeButton.disabled = isBusy || selectedSubscriptions().length === 0;
 }
 
 function setStatus(message, type = "normal") {
@@ -587,12 +654,14 @@ async function saveCleanupHistory({ target, query, byDomain, cleanup }) {
     target,
     query,
     type: byDomain ? "domínio" : "remetente",
+    limit: selectedCleanupPageLimit(),
     mode: cleanup.mode || "auto",
     simulated: Boolean(cleanup.simulated),
     pagesDeleted: Number(cleanup.pagesDeleted || 0),
     visibleCount: Number(cleanup.visibleCount || 0),
     deleted: Boolean(cleanup.deleted),
     stopped: Boolean(cleanup.stopped),
+    stopReason: cleanup.stopReason || cleanup.message || "",
     message: cleanup.message || ""
   };
   const cleanupHistory = [entry, ...current.cleanupHistory].slice(0, 30);
@@ -614,9 +683,19 @@ async function renderHistory() {
     const item = document.createElement("li");
     const date = new Date(entry.at).toLocaleString();
     const action = entry.simulated ? "simulação" : entry.deleted ? "apagou" : "falhou";
-    item.textContent = `${date}: ${entry.type} ${entry.target} - ${action}, ${entry.pagesDeleted || 0} pág. ${entry.stopped ? "(parado)" : ""}`;
+    item.textContent = `${date}: ${entry.type} ${entry.target} - ${action}, ${entry.pagesDeleted || 0} pág., limite ${entry.limit ?? "-"} ${entry.stopped ? "(parado)" : ""}`;
     historyLogEl.appendChild(item);
   }
+}
+
+async function loadSettings() {
+  const stored = await chrome.storage.local.get({ blockedDomains: DEFAULT_BLOCKED_DOMAINS });
+  blockedDomains = normalizeBlockedDomains(stored.blockedDomains);
+  blockedDomainsInput.value = blockedDomains.join("\n");
+}
+
+function normalizeBlockedDomains(values) {
+  return [...new Set(values.map((value) => String(value || "").trim().toLowerCase()).filter(Boolean))].sort();
 }
 
 async function prepareSubscriptions(items) {
@@ -687,8 +766,13 @@ function confirmCleanupMode(items) {
 function blockedSenderReason(email) {
   const domain = emailDomain(email);
   if (!domain) return "";
-  const blocked = BLOCKED_DOMAINS.find((item) => domain === item || domain.endsWith(`.${item}`));
+  const blocked = blockedDomains.find((item) => domain === item || domain.endsWith(`.${item}`));
   return blocked ? `${email} (${blocked})` : "";
+}
+
+async function stopRequested() {
+  const { cleanupStopRequested } = await chrome.storage.local.get({ cleanupStopRequested: false });
+  return Boolean(cleanupStopRequested);
 }
 
 function emailDomain(email) {

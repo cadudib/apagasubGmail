@@ -22,7 +22,7 @@ Ela nao pede senha, nao usa OAuth e nao exige Google Cloud. A extensao trabalha 
 
 1. Baixe a versao mais recente:
 
-   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.38.zip`
+   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.39.zip`
 
 2. Extraia o arquivo ZIP.
 
@@ -142,9 +142,16 @@ scripts/package.sh
 
 ## Versao atual
 
-V1.38
+V1.39
 
 ## Changelog
+
+### V1.39
+
+- Adiciona configurações no popup com domínios bloqueados editáveis.
+- Adiciona `Abrir lixeira filtrada` como undo assistido após uma limpeza.
+- Registra query, limite e motivo de parada no histórico.
+- Adiciona `Simular lote` e `Apagar lote` para remetentes selecionados na lista.
 
 ### V1.38
 
