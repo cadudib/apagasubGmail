@@ -1,9 +1,10 @@
 (() => {
-  if (globalThis.__apagaSubVersion === "1.46.0") return;
-  globalThis.__apagaSubVersion = "1.46.0";
+  if (globalThis.__apagaSubVersion === "1.47.0") return;
+  globalThis.__apagaSubVersion = "1.47.0";
 
   const TEXT_MATCH = /(unsubscribe|unsubscribe here|cancelar inscrição|cancelar inscri[cç][aã]o|cancelar assinatura|cancelar sua assinatura|cancelar subscrição|cancelar a subscri[cç][aã]o|descadastrar|descadastre|sair da lista|remover inscrição|remover inscri[cç][aã]o|gerenciar preferências|gerenciar preferencias)/i;
   const scanSenderCache = new Set();
+  let activeSpeedMode = "normal";
 
   // Message routing.
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -14,6 +15,7 @@
   });
 
   function debug(message) {
+    if (activeSpeedMode === "fast" && /Verificando|Pulando remetente|Botões visíveis|Controles superiores/.test(message)) return;
     chrome.runtime.sendMessage({ type: "debugEvent", message }).catch(() => {});
   }
 
@@ -28,10 +30,16 @@
     if (message?.type === "getCurrentSenderGmail") return { ok: true, sender: bestVisibleSender() };
     if (message?.type === "diagnoseGmail") return { ok: true, diagnostic: diagnoseGmail() };
     if (message?.type === "scanVisibleGmail") return { ok: true, items: scanVisibleGmail() };
-    if (message?.type === "scanPageGmail") return { ok: true, items: await scanPageGmail(message.limit || 25, message.listOnly, message.speedMode || "normal") };
+    if (message?.type === "scanPageGmail") {
+      activeSpeedMode = message.speedMode || "normal";
+      return { ok: true, items: await scanPageGmail(message.limit || 25, message.listOnly, activeSpeedMode) };
+    }
     if (message?.type === "goNextPageGmail") return { ok: true, moved: goNextPageGmail() };
     if (message?.type === "unsubscribeVisibleGmail") return { ok: true, results: await unsubscribeItems(message.items || [], message.cleanupMode || "safe") };
-    if (message?.type === "cleanupVisibleGmail") return { ok: true, cleanup: await cleanupVisibleMessages(message.mode || "safe", message.sender || "", message.pageLimit, message.paginationOnly, message.confirmEachPage, message.speedMode || "normal") };
+    if (message?.type === "cleanupVisibleGmail") {
+      activeSpeedMode = message.speedMode || "normal";
+      return { ok: true, cleanup: await cleanupVisibleMessages(message.mode || "safe", message.sender || "", message.pageLimit, message.paginationOnly, message.confirmEachPage, activeSpeedMode) };
+    }
     return { ok: false, error: "Ação desconhecida." };
   }
 
@@ -351,6 +359,7 @@
     let stopReason = "";
     const pageReport = [];
     const maxPages = normalizePageLimit(pageLimit);
+    let adaptivePause = speedDelay(speedMode, 2500);
     progress(`Limite desta limpeza: ${maxPages === 100 ? "até acabar" : `${maxPages} página(s)`}.`);
 
     for (let page = 1; page <= maxPages; page += 1) {
@@ -382,9 +391,12 @@
       pagesDeleted += 1;
       pageReport.push({ page, count: visibleCount, deleted: true });
       progress(`Página ${page} enviada para a lixeira. Total apagado: ${pagesDeleted}.`);
-      await wait(speedDelay(speedMode, 2500));
+      await wait(adaptivePause);
 
-      const changed = await waitFor(() => visibleRowsSnapshot() !== beforeKey, speedTimeout(speedMode, 7000));
+      const changed = speedMode === "fast" && visibleMessageRows().length === 0
+        ? true
+        : await waitFor(() => visibleRowsSnapshot() !== beforeKey, speedTimeout(speedMode, 7000));
+      adaptivePause = changed ? Math.max(300, Math.round(adaptivePause * 0.8)) : Math.min(4000, Math.round(adaptivePause * 1.35));
       if (!changed && visibleMessageRows().length > 0) {
         stoppedBecauseListDidNotChange = true;
         stopReason = "lista não mudou após clique na lixeira";

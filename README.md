@@ -22,7 +22,7 @@ Ela nao pede senha, nao usa OAuth e nao exige Google Cloud. A extensao trabalha 
 
 1. Baixe a versao mais recente:
 
-   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.46.zip`
+   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.47.zip`
 
 2. Extraia o arquivo ZIP.
 
@@ -165,9 +165,17 @@ scripts/package.sh
 
 ## Versao atual
 
-V1.46
+V1.47
 
 ## Changelog
+
+### V1.47
+
+- Em modo rapido, reduz logs repetitivos para diminuir overhead no popup.
+- Usa pausa adaptativa entre paginas durante a limpeza.
+- Usa caminho mais direto apos exclusao quando a lista fica vazia rapidamente.
+- Mantem dry-run obrigatorio apenas quando a opcao estiver ativada.
+- Reduz o limite padrao de limpeza para 5 paginas.
 
 ### V1.46
 
