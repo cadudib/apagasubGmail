@@ -10,7 +10,7 @@
     <main class="shell">
       <header class="topbar">
         <div>
-          <h1>Apaga Sub V1.40</h1>
+          <h1>Apaga Sub V1.41</h1>
           <p id="status">Escolha um termo pronto para preencher a busca do Gmail.</p>
         </div>
       </header>
@@ -29,6 +29,8 @@
           <button id="testPaginationButton" type="button" title="Testa a paginação do remetente em modo simulação, sem selecionar nem apagar mensagens.">Testar paginação</button>
           <button id="simulateDeleteSenderButton" type="button" title="Simula quantas mensagens/páginas seriam processadas para o remetente atual. Não apaga nada.">Simular apagar</button>
           <button id="deleteCurrentPageButton" type="button" title="Filtra o remetente atual e apaga somente a página visível, com confirmação.">Apagar pág. atual</button>
+          <button id="quarantineButton" type="button" title="Filtra o remetente atual e seleciona mensagens visíveis para você revisar/manualizar. Não apaga.">Quarentena</button>
+          <button id="diagnosticButton" type="button" title="Testa se a extensão encontra busca, linhas, seleção, lixeira e próxima página no Gmail atual.">Diagnóstico</button>
           <button id="deleteSenderButton" type="button" title="Filtra o remetente atual e apaga mensagens visíveis até o limite configurado.">Filtrar e apagar</button>
           <button id="deleteDomainButton" type="button" title="Busca pelo domínio inteiro do remetente atual e apaga mensagens visíveis até o limite. Use com cuidado.">Apagar domínio</button>
           <button id="scanButton" type="button" title="Lista as linhas visíveis do Gmail sem procurar links de descadastro.">Ver linhas</button>
@@ -99,7 +101,18 @@
         <strong>Configurações</strong>
         <label for="blockedDomainsInput">Domínios bloqueados</label>
         <textarea id="blockedDomainsInput" rows="4"></textarea>
+        <label for="protectedKeywordsInput">Palavras protegidas</label>
+        <textarea id="protectedKeywordsInput" rows="3"></textarea>
+        <div class="settings-actions">
+          <button id="exportSettingsButton" type="button" title="Copia as configurações em JSON.">Exportar config</button>
+          <button id="importSettingsButton" type="button" title="Importa configurações em JSON da área de transferência.">Importar config</button>
+        </div>
         <button id="saveSettingsButton" type="button" title="Salva a lista editável de domínios bloqueados.">Salvar configurações</button>
+      </section>
+
+      <section class="summary-panel help-panel">
+        <strong>Ajuda</strong>
+        <p>Fluxo seguro: teste paginação, simule, apague página atual, depois aumente o limite. Use Quarentena para selecionar sem apagar.</p>
       </section>
 
       <section class="debug-panel">

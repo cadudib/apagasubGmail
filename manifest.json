@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Apaga Sub V1.40",
+  "name": "Apaga Sub V1.41",
   "description": "Ajuda a sair de newsletters usando o Gmail aberto no navegador.",
-  "version": "1.40.0",
+  "version": "1.41.0",
   "action": {
     "default_popup": "src/popup.html",
     "default_title": "Apaga Sub"

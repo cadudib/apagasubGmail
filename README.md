@@ -22,7 +22,7 @@ Ela nao pede senha, nao usa OAuth e nao exige Google Cloud. A extensao trabalha 
 
 1. Baixe a versao mais recente:
 
-   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.40.zip`
+   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.41.zip`
 
 2. Extraia o arquivo ZIP.
 
@@ -142,9 +142,17 @@ scripts/package.sh
 
 ## Versao atual
 
-V1.40
+V1.41
 
 ## Changelog
+
+### V1.41
+
+- Adiciona importação/exportação de configurações.
+- Adiciona palavras-chave protegidas editáveis para evitar limpezas arriscadas.
+- Adiciona `Quarentena`, que filtra e seleciona sem apagar.
+- Adiciona `Diagnóstico` de seletores do Gmail.
+- Adiciona ajuda curta com fluxo seguro recomendado.
 
 ### V1.40
 

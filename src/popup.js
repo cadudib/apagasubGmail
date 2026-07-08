@@ -4,6 +4,8 @@ const filterSenderButton = document.querySelector("#filterSenderButton");
 const testPaginationButton = document.querySelector("#testPaginationButton");
 const simulateDeleteSenderButton = document.querySelector("#simulateDeleteSenderButton");
 const deleteCurrentPageButton = document.querySelector("#deleteCurrentPageButton");
+const quarantineButton = document.querySelector("#quarantineButton");
+const diagnosticButton = document.querySelector("#diagnosticButton");
 const deleteSenderButton = document.querySelector("#deleteSenderButton");
 const deleteDomainButton = document.querySelector("#deleteDomainButton");
 const nextPageButton = document.querySelector("#nextPageButton");
@@ -27,7 +29,10 @@ const exportLogButton = document.querySelector("#exportLogButton");
 const exportCsvButton = document.querySelector("#exportCsvButton");
 const openTrashButton = document.querySelector("#openTrashButton");
 const blockedDomainsInput = document.querySelector("#blockedDomainsInput");
+const protectedKeywordsInput = document.querySelector("#protectedKeywordsInput");
 const saveSettingsButton = document.querySelector("#saveSettingsButton");
+const exportSettingsButton = document.querySelector("#exportSettingsButton");
+const importSettingsButton = document.querySelector("#importSettingsButton");
 const selectAll = document.querySelector("#selectAll");
 const template = document.querySelector("#subscriptionTemplate");
 const presetButtons = document.querySelectorAll(".preset-button");
@@ -35,6 +40,7 @@ const presetButtons = document.querySelectorAll(".preset-button");
 let subscriptions = [];
 let busy = false;
 let blockedDomains = [];
+let protectedKeywords = [];
 
 const DEFAULT_BLOCKED_DOMAINS = [
   "google.com",
@@ -53,8 +59,10 @@ const DEFAULT_BLOCKED_DOMAINS = [
   "nubank.com.br",
   "mercadopago.com.br"
 ];
+const DEFAULT_PROTECTED_KEYWORDS = ["invoice", "receipt", "security", "bank", "senha", "boleto", "nota fiscal", "pagamento", "fatura"];
 
 blockedDomains = [...DEFAULT_BLOCKED_DOMAINS];
+protectedKeywords = [...DEFAULT_PROTECTED_KEYWORDS];
 loadSettings();
 renderHistory();
 
@@ -165,9 +173,28 @@ stopActionButton.addEventListener("click", async () => {
 
 saveSettingsButton.addEventListener("click", async () => {
   blockedDomains = normalizeBlockedDomains(blockedDomainsInput.value.split(/\s+/));
-  await chrome.storage.local.set({ blockedDomains });
+  protectedKeywords = normalizeKeywords(protectedKeywordsInput.value.split(/\n|,/));
+  await chrome.storage.local.set({ blockedDomains, protectedKeywords });
   blockedDomainsInput.value = blockedDomains.join("\n");
+  protectedKeywordsInput.value = protectedKeywords.join("\n");
   setStatus("Configurações salvas.");
+});
+
+exportSettingsButton.addEventListener("click", async () => {
+  const settings = { blockedDomains, protectedKeywords, cleanupPageLimit: selectedCleanupPageLimit() };
+  await navigator.clipboard.writeText(JSON.stringify(settings, null, 2));
+  setStatus("Configurações exportadas para a área de transferência.");
+});
+
+importSettingsButton.addEventListener("click", async () => {
+  const text = await navigator.clipboard.readText();
+  const settings = JSON.parse(text);
+  blockedDomains = normalizeBlockedDomains(settings.blockedDomains || DEFAULT_BLOCKED_DOMAINS);
+  protectedKeywords = normalizeKeywords(settings.protectedKeywords || DEFAULT_PROTECTED_KEYWORDS);
+  await chrome.storage.local.set({ blockedDomains, protectedKeywords });
+  blockedDomainsInput.value = blockedDomains.join("\n");
+  protectedKeywordsInput.value = protectedKeywords.join("\n");
+  setStatus("Configurações importadas.");
 });
 
 openTrashButton.addEventListener("click", async () => {
@@ -224,6 +251,24 @@ deleteCurrentPageButton.addEventListener("click", async () => {
   });
 });
 
+quarantineButton.addEventListener("click", async () => {
+  await runAction("Preparando quarentena do remetente...", async () => {
+    const response = await sendToGmail({ type: "getCurrentSenderGmail" });
+    const sender = response.sender;
+    await runSenderCleanup(sender, { simulate: false, modeOverride: "semi", pageLimitOverride: 1 });
+  });
+});
+
+diagnosticButton.addEventListener("click", async () => {
+  await runAction("Executando diagnóstico do Gmail...", async () => {
+    const response = await sendToGmail({ type: "diagnoseGmail" });
+    const info = response.diagnostic;
+    const message = `Diagnóstico: busca ${yesNo(info.searchBox)}, linhas ${info.rows}, seleção ${yesNo(info.selectBox)}, lixeira ${yesNo(info.trashButton)}, próxima ${yesNo(info.nextPageButton)}.`;
+    addDebug(message);
+    setStatus(message);
+  });
+});
+
 deleteDomainButton.addEventListener("click", async () => {
   await runAction("Pegando domínio para apagar...", async () => {
     const response = await sendToGmail({ type: "getCurrentSenderGmail" });
@@ -251,6 +296,11 @@ testPaginationButton.addEventListener("click", async () => {
 unsubscribeButton.addEventListener("click", async () => {
   const selected = selectedSubscriptions();
   if (!selected.length) return;
+  const protectedHit = cleanupModeSelect.value === "auto" ? selected.map(protectedKeywordReason).find(Boolean) : "";
+  if (protectedHit) {
+    setStatus(`Limpeza automática bloqueada por palavra protegida: ${protectedHit}`, "error");
+    return;
+  }
   if (!confirmCleanupMode(selected)) return;
 
   await runAction(`Saindo de ${selected.length} selecionada(s)...`, async () => {
@@ -353,7 +403,7 @@ async function runAction(message, action) {
   }
 }
 
-async function runSenderCleanup(sender, { simulate, byDomain = false, paginationOnly = false, pageLimitOverride = null }) {
+async function runSenderCleanup(sender, { simulate, byDomain = false, paginationOnly = false, pageLimitOverride = null, modeOverride = "" }) {
   if (!sender?.email) {
     throw new Error("Abra um e-mail com remetente visível para limpar automaticamente por endereço.");
   }
@@ -382,7 +432,8 @@ async function runSenderCleanup(sender, { simulate, byDomain = false, pagination
   await wait(4000);
 
   setStatus(simulate ? `Contando paginação de ${target}...` : `Selecionando e apagando e-mails de ${target}...`);
-  const cleanupResponse = await sendToGmail({ type: "cleanupVisibleGmail", mode: simulate ? "simulate" : "auto", sender: target, pageLimit, paginationOnly, confirmEachPage: confirmEachPageInput.checked });
+  const mode = modeOverride || (simulate ? "simulate" : "auto");
+  const cleanupResponse = await sendToGmail({ type: "cleanupVisibleGmail", mode, sender: target, pageLimit, paginationOnly, confirmEachPage: confirmEachPageInput.checked });
   const cleanup = cleanupResponse.cleanup;
   subscriptions = [];
   renderSubscriptions();
@@ -393,7 +444,13 @@ async function runSenderCleanup(sender, { simulate, byDomain = false, pagination
 }
 
 async function runBatchCleanup({ simulate }) {
-  const senders = uniqueSenderEmails(selectedSubscriptions());
+  const selected = selectedSubscriptions();
+  const protectedHit = !simulate ? selected.map(protectedKeywordReason).find(Boolean) : "";
+  if (protectedHit) {
+    setStatus(`Lote bloqueado por palavra protegida: ${protectedHit}`, "error");
+    return;
+  }
+  const senders = uniqueSenderEmails(selected);
   if (!senders.length) {
     setStatus("Selecione itens com e-mail de remetente para executar lote.", "error");
     return;
@@ -630,6 +687,8 @@ function setBusy(isBusy) {
   testPaginationButton.disabled = isBusy;
   simulateDeleteSenderButton.disabled = isBusy;
   deleteCurrentPageButton.disabled = isBusy;
+  quarantineButton.disabled = isBusy;
+  diagnosticButton.disabled = isBusy;
   deleteSenderButton.disabled = isBusy;
   deleteDomainButton.disabled = isBusy;
   nextPageButton.disabled = isBusy;
@@ -741,12 +800,18 @@ async function renderHistory() {
 }
 
 async function loadSettings() {
-  const stored = await chrome.storage.local.get({ blockedDomains: DEFAULT_BLOCKED_DOMAINS });
+  const stored = await chrome.storage.local.get({ blockedDomains: DEFAULT_BLOCKED_DOMAINS, protectedKeywords: DEFAULT_PROTECTED_KEYWORDS });
   blockedDomains = normalizeBlockedDomains(stored.blockedDomains);
+  protectedKeywords = normalizeKeywords(stored.protectedKeywords);
   blockedDomainsInput.value = blockedDomains.join("\n");
+  protectedKeywordsInput.value = protectedKeywords.join("\n");
 }
 
 function normalizeBlockedDomains(values) {
+  return [...new Set(values.map((value) => String(value || "").trim().toLowerCase()).filter(Boolean))].sort();
+}
+
+function normalizeKeywords(values) {
   return [...new Set(values.map((value) => String(value || "").trim().toLowerCase()).filter(Boolean))].sort();
 }
 
@@ -824,6 +889,16 @@ function blockedSenderReason(email) {
   if (!domain) return "";
   const blocked = blockedDomains.find((item) => domain === item || domain.endsWith(`.${item}`));
   return blocked ? `${email} (${blocked})` : "";
+}
+
+function protectedKeywordReason(item) {
+  const text = `${item.label || ""} ${item.detail || ""}`.toLowerCase();
+  const keyword = protectedKeywords.find((value) => text.includes(value));
+  return keyword ? `${item.label || item.detail || "item"} (${keyword})` : "";
+}
+
+function yesNo(value) {
+  return value ? "ok" : "não";
 }
 
 async function stopRequested() {
