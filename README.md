@@ -22,7 +22,7 @@ Ela nao pede senha, nao usa OAuth e nao exige Google Cloud. A extensao trabalha 
 
 1. Baixe a versao mais recente:
 
-   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.43.zip`
+   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.44.zip`
 
 2. Extraia o arquivo ZIP.
 
@@ -140,11 +140,42 @@ Para gerar o ZIP de instalacao com o `manifest.json` na raiz:
 scripts/package.sh
 ```
 
+## Roteiro de teste seguro
+
+1. Abra um e-mail de remetente descartavel no Gmail.
+2. Clique em `Filtrar remetente`.
+3. Clique em `Testar paginacao`.
+4. Clique em `Simular apagar`.
+5. Clique em `Apagar pag. atual`.
+6. Use `Abrir lixeira filtrada` para confirmar o resultado.
+7. So depois aumente o `Limite` ou use `Apagar lote`.
+
+## Matriz de acoes
+
+| Acao | Apaga? | Risco | Pre-requisito |
+| --- | --- | --- | --- |
+| Filtrar remetente | Nao | Baixo | E-mail aberto ou linha visivel |
+| Testar paginacao | Nao | Baixo | Resultado de busca do Gmail |
+| Simular apagar | Nao | Baixo | Remetente com e-mail claro |
+| Quarentena | Nao | Medio | Remetente com e-mail claro |
+| Apagar pag. atual | Sim | Medio | Simulacao recomendada |
+| Filtrar e apagar | Sim | Alto | Limite revisado |
+| Apagar dominio | Sim | Alto | Confirmar dominio |
+| Apagar lote | Sim | Alto | Itens selecionados e bloqueios revisados |
+
 ## Versao atual
 
-V1.43
+V1.44
 
 ## Changelog
+
+### V1.44
+
+- Adiciona roteiro de teste seguro e matriz de acoes no README.
+- Reduz ruido visual com `Mais acoes` para controles avancados.
+- Persiste aba, modo e limite de paginas escolhidos.
+- Itens bloqueados/protegidos agora sao desmarcados e ignorados, sem travar a acao dos demais.
+- Mantem o fluxo de lote seguindo com os remetentes permitidos.
 
 ### V1.43
 

@@ -14,6 +14,7 @@ const cleanupModeSelect = document.querySelector("#cleanupMode");
 const cleanupPageLimitSelect = document.querySelector("#cleanupPageLimit");
 const confirmEachPageInput = document.querySelector("#confirmEachPage");
 const uiModeSelect = document.querySelector("#uiMode");
+const moreActionsButton = document.querySelector("#moreActionsButton");
 const lastOperationTextEl = document.querySelector("#lastOperationText");
 const unsubscribeButton = document.querySelector("#unsubscribeButton");
 const stopActionButton = document.querySelector("#stopActionButton");
@@ -47,6 +48,7 @@ let busy = false;
 let blockedDomains = [];
 let protectedKeywords = [];
 let activeTab = "search";
+let showMoreActions = false;
 
 // Settings and safety defaults.
 const DEFAULT_BLOCKED_DOMAINS = [
@@ -344,12 +346,14 @@ testPaginationButton.addEventListener("click", async () => {
 });
 
 unsubscribeButton.addEventListener("click", async () => {
-  const selected = selectedSubscriptions();
+  let selected = selectedSubscriptions();
   if (!selected.length) return;
-  const protectedHit = cleanupModeSelect.value === "auto" ? selected.map(protectedKeywordReason).find(Boolean) : "";
-  if (protectedHit) {
-    setStatus(`Limpeza automática bloqueada por palavra protegida: ${protectedHit}`, "error");
-    return;
+  if (cleanupModeSelect.value === "auto") {
+    selected = deselectBlockedItems(selected, "limpeza automática");
+    if (!selected.length) {
+      setStatus("Todos os itens selecionados foram desmarcados por bloqueios de segurança.", "error");
+      return;
+    }
   }
   if (!confirmCleanupMode(selected)) return;
 
@@ -374,10 +378,20 @@ selectAll.addEventListener("change", () => {
 });
 
 cleanupModeSelect.addEventListener("change", syncActions);
-uiModeSelect.addEventListener("change", applyUiVisibility);
+cleanupPageLimitSelect.addEventListener("change", saveUiPrefs);
+uiModeSelect.addEventListener("change", () => {
+  saveUiPrefs();
+  applyUiVisibility();
+});
+moreActionsButton.addEventListener("click", () => {
+  showMoreActions = !showMoreActions;
+  saveUiPrefs();
+  applyUiVisibility();
+});
 tabButtons.forEach((button) => {
   button.addEventListener("click", () => {
     activeTab = button.dataset.tab || "search";
+    saveUiPrefs();
     applyUiVisibility();
   });
 });
@@ -506,12 +520,7 @@ async function runSenderCleanup(sender, { simulate, byDomain = false, pagination
 }
 
 async function runBatchCleanup({ simulate }) {
-  const selected = selectedSubscriptions();
-  const protectedHit = !simulate ? selected.map(protectedKeywordReason).find(Boolean) : "";
-  if (protectedHit) {
-    setStatus(`Lote bloqueado por palavra protegida: ${protectedHit}`, "error");
-    return;
-  }
+  const selected = !simulate ? deselectBlockedItems(selectedSubscriptions(), "lote") : selectedSubscriptions();
   const senders = uniqueSenderEmails(selected);
   if (!senders.length) {
     setStatus("Selecione itens com e-mail de remetente para executar lote.", "error");
@@ -737,6 +746,33 @@ function selectedSubscriptions() {
     .filter(Boolean);
 }
 
+function deselectBlockedItems(items, context) {
+  const allowed = [];
+  const blockedMessages = [];
+  for (const item of items) {
+    const email = senderEmailFromItem(item);
+    const reason = (email && blockedSenderReason(email)) || protectedKeywordReason(item);
+    if (reason) {
+      blockedMessages.push(reason);
+      uncheckSubscription(item.id);
+      continue;
+    }
+    allowed.push(item);
+  }
+  if (blockedMessages.length) {
+    addDebug(`${context}: ${blockedMessages.length} item(ns) bloqueado(s) desmarcado(s): ${blockedMessages.slice(0, 8).join(" | ")}`);
+    setStatus(`${blockedMessages.length} bloqueado(s) desmarcado(s); seguindo com ${allowed.length}.`);
+    syncActions();
+  }
+  return allowed;
+}
+
+function uncheckSubscription(id) {
+  const article = document.querySelector(`.subscription[data-id="${CSS.escape(id)}"]`);
+  const checkbox = article?.querySelector(".subscription-check");
+  if (checkbox) checkbox.checked = false;
+}
+
 function syncActions() {
   const selected = selectedSubscriptions();
   unsubscribeButton.disabled = selected.length === 0;
@@ -888,11 +924,27 @@ async function renderHistory() {
 
 // Settings and safety helpers.
 async function loadSettings() {
-  const stored = await chrome.storage.local.get({ blockedDomains: DEFAULT_BLOCKED_DOMAINS, protectedKeywords: DEFAULT_PROTECTED_KEYWORDS });
+  const stored = await chrome.storage.local.get({ blockedDomains: DEFAULT_BLOCKED_DOMAINS, protectedKeywords: DEFAULT_PROTECTED_KEYWORDS, uiPrefs: {} });
   blockedDomains = normalizeBlockedDomains(stored.blockedDomains);
   protectedKeywords = normalizeKeywords(stored.protectedKeywords);
   blockedDomainsInput.value = blockedDomains.join("\n");
   protectedKeywordsInput.value = protectedKeywords.join("\n");
+  if (stored.uiPrefs?.mode) uiModeSelect.value = stored.uiPrefs.mode;
+  if (stored.uiPrefs?.tab) activeTab = stored.uiPrefs.tab;
+  if (typeof stored.uiPrefs?.showMoreActions === "boolean") showMoreActions = stored.uiPrefs.showMoreActions;
+  if (stored.uiPrefs?.cleanupPageLimit) cleanupPageLimitSelect.value = String(stored.uiPrefs.cleanupPageLimit);
+  applyUiVisibility();
+}
+
+async function saveUiPrefs() {
+  await chrome.storage.local.set({
+    uiPrefs: {
+      mode: uiModeSelect.value,
+      tab: activeTab,
+      showMoreActions,
+      cleanupPageLimit: selectedCleanupPageLimit()
+    }
+  });
 }
 
 function normalizeBlockedDomains(values) {
@@ -1045,12 +1097,13 @@ function clearDebug() {
 
 function applyUiVisibility() {
   const isAdvanced = uiModeSelect.value === "advanced";
+  moreActionsButton.textContent = showMoreActions ? "Menos ações" : "Mais ações";
   tabButtons.forEach((button) => {
     button.setAttribute("aria-selected", String((button.dataset.tab || "search") === activeTab));
   });
   document.querySelectorAll("[data-group]").forEach((element) => {
     const sameGroup = (element.dataset.group || "").split(/\s+/).includes(activeTab);
-    const advancedAllowed = isAdvanced || element.dataset.advanced !== "true";
+    const advancedAllowed = element.dataset.advanced !== "true" || (isAdvanced && showMoreActions);
     element.hidden = !sameGroup || !advancedAllowed;
   });
   document.querySelectorAll("[data-group-panel]").forEach((element) => {
