@@ -22,7 +22,7 @@ Ela nao pede senha, nao usa OAuth e nao exige Google Cloud. A extensao trabalha 
 
 1. Baixe a versao mais recente:
 
-   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.34.zip`
+   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.35.zip`
 
 2. Extraia o arquivo ZIP.
 
@@ -142,9 +142,14 @@ scripts/package.sh
 
 ## Versao atual
 
-V1.34
+V1.35
 
 ## Changelog
+
+### V1.35
+
+- Faz a limpeza automática continuar por páginas do mesmo remetente até não haver mais mensagens visíveis ou próxima página.
+- Adiciona limite de segurança de 20 páginas por remetente e para se a lista não mudar após clicar na lixeira.
 
 ### V1.34
 

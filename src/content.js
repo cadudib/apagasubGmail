@@ -1,6 +1,6 @@
 (() => {
-  if (globalThis.__apagaSubVersion === "1.34.0") return;
-  globalThis.__apagaSubVersion = "1.34.0";
+  if (globalThis.__apagaSubVersion === "1.35.0") return;
+  globalThis.__apagaSubVersion = "1.35.0";
 
   const TEXT_MATCH = /(unsubscribe|unsubscribe here|cancelar inscrição|cancelar inscri[cç][aã]o|cancelar assinatura|cancelar sua assinatura|cancelar subscrição|cancelar a subscri[cç][aã]o|descadastrar|descadastre|sair da lista|remover inscrição|remover inscri[cç][aã]o|gerenciar preferências|gerenciar preferencias)/i;
 
@@ -228,7 +228,7 @@
     const listReady = await waitForListView(10000);
     if (!listReady) {
       debug(`Limpeza falhou: lista não carregou para ${sender}.`);
-      return { attempted: true, sender, mode, selected: false, deleted: false, message: "A busca do remetente não carregou a lista a tempo." };
+      return { attempted: true, sender, mode, selected: false, deleted: false, pagesDeleted: 0, message: "A busca do remetente não carregou a lista a tempo." };
     }
 
     if (mode === "safe") {
@@ -250,16 +250,68 @@
       };
     }
 
-    const deleted = selected && await waitFor(() => clickTrashButton(), 7000);
-    debug(deleted ? "Cliquei na lixeira para mensagens selecionadas." : "Não encontrei a lixeira.");
-    if (deleted) await wait(1500);
+    if (!selected) {
+      return {
+        attempted: true,
+        sender,
+        mode,
+        selected,
+        deleted: false,
+        pagesDeleted: 0,
+        message: "Não consegui selecionar mensagens visíveis."
+      };
+    }
+
+    let deleted = false;
+    let pagesDeleted = 0;
+    let stoppedBecauseListDidNotChange = false;
+    const maxPages = 20;
+
+    for (let page = 1; page <= maxPages; page += 1) {
+      const beforeKey = visibleRowsSnapshot();
+      const pageSelected = page === 1 ? true : await selectVisibleMessages();
+      debug(pageSelected ? `Página ${page}: mensagens selecionadas.` : `Página ${page}: não consegui selecionar mensagens.`);
+      if (!pageSelected) break;
+      await wait(1000);
+
+      const pageDeleted = await waitFor(() => clickTrashButton(), 7000);
+      debug(pageDeleted ? `Página ${page}: cliquei na lixeira.` : `Página ${page}: não encontrei a lixeira.`);
+      if (!pageDeleted) break;
+
+      deleted = true;
+      pagesDeleted += 1;
+      await wait(2500);
+
+      const changed = await waitFor(() => visibleRowsSnapshot() !== beforeKey, 7000);
+      if (!changed && visibleMessageRows().length > 0) {
+        stoppedBecauseListDidNotChange = true;
+        debug("Limpeza interrompida: cliquei na lixeira, mas a lista visível não mudou.");
+        break;
+      }
+
+      if (visibleMessageRows().length > 0) continue;
+
+      const moved = goNextPageGmail();
+      debug(moved ? "Avançando para próxima página do remetente." : "Não há próxima página visível para este remetente.");
+      if (!moved) break;
+
+      const nextReady = await waitForListView(8000);
+      if (!nextReady) break;
+      await wait(1200);
+    }
+
     return {
       attempted: true,
       sender,
       mode,
       selected,
       deleted,
-      message: deleted ? "Mensagens selecionadas enviadas para a lixeira." : "Não consegui enviar mensagens para a lixeira."
+      pagesDeleted,
+      message: deleted
+        ? stoppedBecauseListDidNotChange
+          ? `${pagesDeleted} página(s) enviada(s) para a lixeira; parei porque a lista não mudou depois do clique.`
+          : `${pagesDeleted} página(s) enviada(s) para a lixeira.`
+        : "Não consegui enviar mensagens para a lixeira."
     };
   }
 
@@ -288,6 +340,10 @@
     }
 
     return Boolean(findToolbarTrashButton()) || choseAll;
+  }
+
+  function visibleRowsSnapshot() {
+    return visibleMessageRows().map((row) => row.key).join("|");
   }
 
   function clickTrashButton() {
@@ -646,6 +702,11 @@
   }
 
   function goNextPageGmail() {
+    const safeNextButton = findNextPageButton();
+    if (!safeNextButton) return false;
+    activateElement(safeNextButton);
+    return true;
+
     const nextButton = [...document.querySelectorAll("[aria-label], [data-tooltip], [role='button'], div[role='button']")]
       .filter(isVisible)
       .find((element) => {
@@ -656,6 +717,17 @@
     if (!nextButton) return false;
     activateElement(nextButton);
     return true;
+  }
+
+  function findNextPageButton() {
+    return [...document.querySelectorAll("[aria-label], [data-tooltip], [role='button'], div[role='button']")]
+      .filter(isVisible)
+      .filter((element) => element.getAttribute("aria-disabled") !== "true" && !element.classList.contains("T-I-JE"))
+      .filter(isToolbarControl)
+      .find((element) => {
+        const text = controlLabelText(element) || elementSearchText(element);
+        return /^(older|mais antigas|próxima|proxima)$/i.test(text) || /next page|página seguinte|pagina seguinte|older|mais antigas/i.test(text);
+      }) || null;
   }
 
   function openMessageRow(rowElement) {
