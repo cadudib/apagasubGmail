@@ -22,7 +22,7 @@ Ela nao pede senha, nao usa OAuth e nao exige Google Cloud. A extensao trabalha 
 
 1. Baixe a versao mais recente:
 
-   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.29.zip`
+   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.30.zip`
 
 2. Extraia o arquivo ZIP.
 
@@ -142,9 +142,14 @@ scripts/package.sh
 
 ## Versao atual
 
-V1.29
+V1.30
 
 ## Changelog
+
+### V1.30
+
+- Troca o disparo da busca do Gmail para uma ação interna sem `form.submit()`, evitando refresh da página.
+- Adiciona retry automático da busca para cobrir o caso em que o primeiro clique apenas foca/preenche e o segundo efetivamente pesquisa.
 
 ### V1.29
 

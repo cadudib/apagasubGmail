@@ -120,10 +120,18 @@ selectAll.addEventListener("change", () => {
 cleanupModeSelect.addEventListener("change", syncActions);
 
 async function openGmailSearch(query) {
-  try {
-    await sendToGmail({ type: "fillSearchGmail", query });
-  } catch (error) {
-    addDebug(`Busca pelo campo falhou; aplicando URL direta: ${error.message}`);
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      const response = await sendToGmail({ type: "runSearchGmail", query });
+      if (response.searched) {
+        await wait(1000);
+        return;
+      }
+      addDebug(`Busca não confirmou na tentativa ${attempt}; tentando novamente.`);
+    } catch (error) {
+      addDebug(`Busca pelo Gmail falhou na tentativa ${attempt}: ${error.message}`);
+    }
+    await wait(1000);
   }
 
   const tab = await currentGmailTab();

@@ -1,6 +1,6 @@
 (() => {
-  if (globalThis.__apagaSubVersion === "1.29.0") return;
-  globalThis.__apagaSubVersion = "1.29.0";
+  if (globalThis.__apagaSubVersion === "1.30.0") return;
+  globalThis.__apagaSubVersion = "1.30.0";
 
   const TEXT_MATCH = /(unsubscribe|unsubscribe here|cancelar inscrição|cancelar inscri[cç][aã]o|cancelar assinatura|cancelar sua assinatura|cancelar subscrição|cancelar a subscri[cç][aã]o|descadastrar|descadastre|sair da lista|remover inscrição|remover inscri[cç][aã]o|gerenciar preferências|gerenciar preferencias)/i;
 
@@ -17,6 +17,7 @@
 
   async function handleMessage(message) {
     if (message?.type === "fillSearchGmail") return { ok: true, filled: fillSearchGmail(message.query || "") };
+    if (message?.type === "runSearchGmail") return { ok: true, searched: await runSearchGmail(message.query || "") };
     if (message?.type === "getCurrentSenderGmail") return { ok: true, sender: bestVisibleSender() };
     if (message?.type === "scanVisibleGmail") return { ok: true, items: scanVisibleGmail() };
     if (message?.type === "scanPageGmail") return { ok: true, items: await scanPageGmail(message.limit || 25) };
@@ -27,21 +28,58 @@
   }
 
   function fillSearchGmail(query) {
-    const searchBox = document.querySelector('input[name="q"], textarea[name="q"], input[aria-label*="Search"], input[aria-label*="Pesquisar"], textarea[aria-label*="Search"], textarea[aria-label*="Pesquisar"]');
+    const searchBox = findSearchBox();
     if (!searchBox || !query.trim()) return false;
     searchBox.focus();
+    searchBox.select?.();
     searchBox.value = query;
     searchBox.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: query }));
     searchBox.dispatchEvent(new Event("change", { bubbles: true }));
-    for (const type of ["keydown", "keypress", "keyup"]) {
-      searchBox.dispatchEvent(new KeyboardEvent(type, { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true, cancelable: true }));
-    }
-    const form = searchBox.closest("form");
-    if (form) {
-      form.dispatchEvent(new SubmitEvent("submit", { bubbles: true, cancelable: true }));
-      if (typeof form.submit === "function") form.submit();
-    }
     return true;
+  }
+
+  async function runSearchGmail(query) {
+    const ready = await waitFor(() => Boolean(findSearchBox()), 3000);
+    if (!ready || !fillSearchGmail(query)) return false;
+    await wait(250);
+
+    const searchBox = findSearchBox();
+    if (searchBox) {
+      for (const type of ["keydown", "keypress", "keyup"]) {
+        searchBox.dispatchEvent(new KeyboardEvent(type, { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true, cancelable: true }));
+      }
+    }
+
+    await wait(1200);
+    if (searchLooksActive(query)) return true;
+
+    const searchButton = findSearchButton(searchBox);
+    if (searchButton) {
+      activateElement(searchButton);
+      await wait(1800);
+    }
+
+    return searchLooksActive(query);
+  }
+
+  function findSearchBox() {
+    return document.querySelector('input[name="q"], textarea[name="q"], input[aria-label*="Search"], input[aria-label*="Pesquisar"], textarea[aria-label*="Search"], textarea[aria-label*="Pesquisar"]');
+  }
+
+  function findSearchButton(searchBox) {
+    const roots = [searchBox?.closest("form"), document].filter(Boolean);
+    for (const root of roots) {
+      const button = [...root.querySelectorAll("[aria-label], [data-tooltip], [role='button'], button")]
+        .filter(isVisible)
+        .find((element) => /^(search|pesquisar|pesquisar e-mail|search mail)$/i.test(elementSearchText(element)) || /search|pesquisar/i.test(elementSearchText(element)));
+      if (button) return button;
+    }
+    return null;
+  }
+
+  function searchLooksActive(query) {
+    const hash = decodeURIComponent(location.hash || "");
+    return hash.includes("/search/") && hash.toLowerCase().includes(query.toLowerCase());
   }
 
   function scanVisibleGmail() {
