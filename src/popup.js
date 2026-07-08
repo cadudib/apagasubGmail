@@ -1,11 +1,13 @@
 const scanButton = document.querySelector("#scanButton");
 const deepScanButton = document.querySelector("#deepScanButton");
 const filterSenderButton = document.querySelector("#filterSenderButton");
+const simulateDeleteSenderButton = document.querySelector("#simulateDeleteSenderButton");
 const deleteSenderButton = document.querySelector("#deleteSenderButton");
 const nextPageButton = document.querySelector("#nextPageButton");
 const scanLimitSelect = document.querySelector("#scanLimit");
 const cleanupModeSelect = document.querySelector("#cleanupMode");
 const unsubscribeButton = document.querySelector("#unsubscribeButton");
+const stopActionButton = document.querySelector("#stopActionButton");
 const statusEl = document.querySelector("#status");
 const resultsEl = document.querySelector("#results");
 const summaryTextEl = document.querySelector("#summaryText");
@@ -18,10 +20,35 @@ const template = document.querySelector("#subscriptionTemplate");
 const presetButtons = document.querySelectorAll(".preset-button");
 
 let subscriptions = [];
+let busy = false;
+
+const BLOCKED_DOMAINS = [
+  "google.com",
+  "accounts.google.com",
+  "apple.com",
+  "icloud.com",
+  "microsoft.com",
+  "outlook.com",
+  "live.com",
+  "gov.br",
+  "caixa.gov.br",
+  "bb.com.br",
+  "itau.com.br",
+  "bradesco.com.br",
+  "santander.com.br",
+  "nubank.com.br",
+  "mercadopago.com.br"
+];
 
 chrome.runtime.onMessage.addListener((message) => {
-  if (message?.type !== "debugEvent") return;
-  addDebug(message.message);
+  if (message?.type === "debugEvent") {
+    addDebug(message.message);
+    return;
+  }
+  if (message?.type === "cleanupProgress") {
+    setStatus(message.message);
+    addDebug(message.message);
+  }
 });
 
 presetButtons.forEach((button) => {
@@ -67,6 +94,12 @@ copyDebugButton.addEventListener("click", async () => {
   setStatus("Debug copiado para a área de transferência.");
 });
 
+stopActionButton.addEventListener("click", async () => {
+  await chrome.storage.local.set({ cleanupStopRequested: true });
+  stopActionButton.disabled = true;
+  setStatus("Parada solicitada. Aguarde a etapa atual terminar...");
+});
+
 nextPageButton.addEventListener("click", async () => {
   await runAction("Avançando para a próxima página do Gmail...", async () => {
     const response = await sendToGmail({ type: "goNextPageGmail" });
@@ -97,25 +130,15 @@ deleteSenderButton.addEventListener("click", async () => {
   await runAction("Pegando remetente para apagar...", async () => {
     const response = await sendToGmail({ type: "getCurrentSenderGmail" });
     const sender = response.sender;
-    if (!sender?.email) {
-      throw new Error("Abra um e-mail com remetente visível para apagar automaticamente por endereço.");
-    }
-    if (!confirm(`Filtrar e enviar para a lixeira os e-mails visíveis de:\n\n${sender.email}\n\nContinuar?`)) {
-      setStatus("Ação cancelada.");
-      return;
-    }
+    await runSenderCleanup(sender, { simulate: false });
+  });
+});
 
-    const query = `from:${sender.email}`;
-    setStatus(`Filtrando ${sender.email}...`);
-    await openGmailSearch(query);
-    await wait(4000);
-
-    setStatus(`Selecionando e apagando e-mails de ${sender.email}...`);
-    const cleanupResponse = await sendToGmail({ type: "cleanupVisibleGmail", mode: "auto", sender: sender.email });
-    const cleanup = cleanupResponse.cleanup;
-    subscriptions = [];
-    renderSubscriptions();
-    setStatus(cleanup?.message || `Limpeza concluída para ${sender.email}.`, cleanup?.deleted ? "normal" : "error");
+simulateDeleteSenderButton.addEventListener("click", async () => {
+  await runAction("Simulando limpeza do remetente...", async () => {
+    const response = await sendToGmail({ type: "getCurrentSenderGmail" });
+    const sender = response.sender;
+    await runSenderCleanup(sender, { simulate: true });
   });
 });
 
@@ -203,6 +226,7 @@ async function currentGmailTab() {
 }
 
 async function runAction(message, action) {
+  await chrome.storage.local.set({ cleanupStopRequested: false });
   setBusy(true);
   setStatus(message);
   try {
@@ -213,6 +237,33 @@ async function runAction(message, action) {
   } finally {
     setBusy(false);
   }
+}
+
+async function runSenderCleanup(sender, { simulate }) {
+  if (!sender?.email) {
+    throw new Error("Abra um e-mail com remetente visível para limpar automaticamente por endereço.");
+  }
+  const blocked = !simulate ? blockedSenderReason(sender.email) : "";
+  if (blocked) {
+    throw new Error(`Remetente bloqueado por segurança: ${blocked}. Use o Gmail manualmente para esse caso.`);
+  }
+  if (!simulate && !confirm(`Filtrar e enviar para a lixeira os e-mails visíveis de:\n\n${sender.email}\n\nContinuar?`)) {
+    setStatus("Ação cancelada.");
+    return;
+  }
+
+  const query = `from:${sender.email}`;
+  setStatus(`${simulate ? "Simulando" : "Filtrando"} ${sender.email}...`);
+  await openGmailSearch(query);
+  await wait(4000);
+
+  setStatus(simulate ? `Contando mensagens visíveis de ${sender.email}...` : `Selecionando e apagando e-mails de ${sender.email}...`);
+  const cleanupResponse = await sendToGmail({ type: "cleanupVisibleGmail", mode: simulate ? "simulate" : "auto", sender: sender.email });
+  const cleanup = cleanupResponse.cleanup;
+  subscriptions = [];
+  renderSubscriptions();
+  setCleanupSummary(cleanup);
+  setStatus(cleanup?.message || `Limpeza concluída para ${sender.email}.`, cleanup?.deleted || cleanup?.simulated ? "normal" : "error");
 }
 
 function renderSubscriptions() {
@@ -343,6 +394,12 @@ async function cleanupAfterUnsubscribe(results) {
       result.cleanup = { attempted: false, sender: "", mode, message: "Remetente sem e-mail claro." };
       continue;
     }
+    const blocked = mode === "auto" ? blockedSenderReason(sender) : "";
+    if (blocked) {
+      result.cleanup = { attempted: false, sender, mode, message: `Remetente bloqueado por segurança: ${blocked}.` };
+      addDebug(result.cleanup.message);
+      continue;
+    }
 
     setStatus(`Limpando e-mails de ${sender}...`);
     await openGmailSearch(`from:${sender}`);
@@ -351,6 +408,7 @@ async function cleanupAfterUnsubscribe(results) {
     try {
       const response = await sendToGmail({ type: "cleanupVisibleGmail", mode, sender });
       result.cleanup = response.cleanup || { attempted: false, sender, mode, message: "Limpeza sem resposta detalhada." };
+      setCleanupSummary(result.cleanup);
     } catch (error) {
       result.cleanup = { attempted: false, sender, mode, message: `Falha na limpeza: ${error.message}` };
       addDebug(result.cleanup.message);
@@ -387,13 +445,16 @@ function syncActions() {
 }
 
 function setBusy(busy) {
+  window.busy = busy;
   scanButton.disabled = busy;
   deepScanButton.disabled = busy;
   filterSenderButton.disabled = busy;
+  simulateDeleteSenderButton.disabled = busy;
   deleteSenderButton.disabled = busy;
   nextPageButton.disabled = busy;
   scanLimitSelect.disabled = busy;
   cleanupModeSelect.disabled = busy;
+  stopActionButton.disabled = !busy;
   presetButtons.forEach((button) => {
     button.disabled = busy;
   });
@@ -419,8 +480,20 @@ function setRunSummary(results) {
   const confirmed = results.filter((result) => result.ok && !/manual|aberto|confirme/i.test(result.message)).length;
   const manual = results.filter((result) => result.ok && /manual|aberto|confirme/i.test(result.message)).length;
   const failed = results.filter((result) => !result.ok).length;
-  const cleaned = results.filter((result) => result.cleanup?.attempted).length;
-  summaryTextEl.textContent = `${confirmed} confirmado(s), ${manual} precisa(m) confirmação manual, ${failed} falhou(aram), ${cleaned} limpeza(s) iniciada(s).`;
+  const cleanups = results.map((result) => result.cleanup).filter(Boolean);
+  const cleaned = cleanups.filter((cleanup) => cleanup.attempted).length;
+  const pages = cleanups.reduce((total, cleanup) => total + Number(cleanup.pagesDeleted || 0), 0);
+  const stopped = cleanups.some((cleanup) => cleanup.stopped);
+  summaryTextEl.textContent = `${confirmed} confirmado(s), ${manual} precisa(m) confirmação manual, ${failed} falhou(aram), ${cleaned} limpeza(s), ${pages} página(s) apagada(s)${stopped ? ", parada solicitada" : ""}.`;
+}
+
+function setCleanupSummary(cleanup) {
+  if (!cleanup) return;
+  if (cleanup.simulated) {
+    summaryTextEl.textContent = `Simulação: ${cleanup.visibleCount || 0} mensagem(ns) visível(is), próxima página: ${cleanup.hasNextPage ? "sim" : "não"}.`;
+    return;
+  }
+  summaryTextEl.textContent = `Limpeza: ${cleanup.pagesDeleted || 0} página(s) apagada(s), selecionou: ${cleanup.selected ? "sim" : "não"}, apagou: ${cleanup.deleted ? "sim" : "não"}${cleanup.stopped ? ", parada solicitada" : ""}.`;
 }
 
 async function saveHistory(results) {
@@ -490,9 +563,24 @@ function selectedScanLimit() {
 function confirmCleanupMode(items) {
   if (cleanupModeSelect.value !== "auto") return true;
   const senders = uniqueSenderEmails(items);
+  const blocked = senders.map(blockedSenderReason).find(Boolean);
+  if (blocked) {
+    alert(`Há remetente bloqueado por segurança: ${blocked}. Ele será ignorado na limpeza automática.`);
+  }
   const preview = senders.length ? senders.slice(0, 5).join("\n") : "remetentes sem e-mail claro";
   const extra = senders.length > 5 ? `\n...e mais ${senders.length - 5}` : "";
   return confirm(`Modo automático vai selecionar e enviar para a lixeira os e-mails visíveis destes remetentes após o descadastro:\n\n${preview}${extra}\n\nContinuar?`);
+}
+
+function blockedSenderReason(email) {
+  const domain = emailDomain(email);
+  if (!domain) return "";
+  const blocked = BLOCKED_DOMAINS.find((item) => domain === item || domain.endsWith(`.${item}`));
+  return blocked ? `${email} (${blocked})` : "";
+}
+
+function emailDomain(email) {
+  return String(email || "").toLowerCase().split("@").pop().trim();
 }
 
 function updateCleanupPreview() {

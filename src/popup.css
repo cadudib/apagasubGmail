@@ -52,6 +52,7 @@ button:disabled {
 #scanButton,
 #deepScanButton,
 #filterSenderButton,
+#simulateDeleteSenderButton,
 #deleteSenderButton,
 #nextPageButton,
 #unsubscribeButton {
@@ -63,6 +64,7 @@ button:disabled {
 #scanButton:hover,
 #deepScanButton:hover,
 #filterSenderButton:hover,
+#simulateDeleteSenderButton:hover,
 #deleteSenderButton:hover,
 #nextPageButton:hover,
 #unsubscribeButton:hover {
@@ -112,6 +114,15 @@ p {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
+
+#stopActionButton {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+#stopActionButton:hover:not(:disabled) {
+  background: #fff5f5;
 }
 
 .scan-options {

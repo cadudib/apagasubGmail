@@ -1,6 +1,6 @@
 (() => {
-  if (globalThis.__apagaSubVersion === "1.35.0") return;
-  globalThis.__apagaSubVersion = "1.35.0";
+  if (globalThis.__apagaSubVersion === "1.36.0") return;
+  globalThis.__apagaSubVersion = "1.36.0";
 
   const TEXT_MATCH = /(unsubscribe|unsubscribe here|cancelar inscrição|cancelar inscri[cç][aã]o|cancelar assinatura|cancelar sua assinatura|cancelar subscrição|cancelar a subscri[cç][aã]o|descadastrar|descadastre|sair da lista|remover inscrição|remover inscri[cç][aã]o|gerenciar preferências|gerenciar preferencias)/i;
 
@@ -13,6 +13,11 @@
 
   function debug(message) {
     chrome.runtime.sendMessage({ type: "debugEvent", message }).catch(() => {});
+  }
+
+  function progress(message) {
+    chrome.runtime.sendMessage({ type: "cleanupProgress", message }).catch(() => {});
+    debug(message);
   }
 
   async function handleMessage(message) {
@@ -201,7 +206,7 @@
   }
 
   function normalizeCleanupMode(mode) {
-    return ["safe", "semi", "auto", "off"].includes(mode) ? mode : "safe";
+    return ["safe", "semi", "auto", "off", "simulate"].includes(mode) ? mode : "safe";
   }
 
   async function processUnsubscribeItem(item) {
@@ -236,6 +241,14 @@
       return { attempted: true, sender, mode, message: "Filtro por remetente aplicado." };
     }
 
+    if (mode === "simulate") {
+      const visibleCount = visibleMessageRows().length;
+      const hasNextPage = Boolean(findNextPageButton());
+      const message = `Simulação: ${visibleCount} mensagem(ns) visível(is); próxima página: ${hasNextPage ? "sim" : "não"}.`;
+      progress(message);
+      return { attempted: true, sender, mode, simulated: true, visibleCount, hasNextPage, pagesDeleted: 0, deleted: false, message };
+    }
+
     const selected = await selectVisibleMessages();
     debug(selected ? "Mensagens visíveis selecionadas." : "Não consegui selecionar mensagens visíveis.");
     if (selected) await wait(1200);
@@ -265,21 +278,28 @@
     let deleted = false;
     let pagesDeleted = 0;
     let stoppedBecauseListDidNotChange = false;
+    let stopped = false;
     const maxPages = 20;
 
     for (let page = 1; page <= maxPages; page += 1) {
+      if (await shouldStopCleanup()) {
+        stopped = true;
+        progress("Limpeza interrompida antes da próxima página.");
+        break;
+      }
       const beforeKey = visibleRowsSnapshot();
       const pageSelected = page === 1 ? true : await selectVisibleMessages();
-      debug(pageSelected ? `Página ${page}: mensagens selecionadas.` : `Página ${page}: não consegui selecionar mensagens.`);
+      progress(pageSelected ? `Página ${page}: mensagens selecionadas.` : `Página ${page}: não consegui selecionar mensagens.`);
       if (!pageSelected) break;
       await wait(1000);
 
       const pageDeleted = await waitFor(() => clickTrashButton(), 7000);
-      debug(pageDeleted ? `Página ${page}: cliquei na lixeira.` : `Página ${page}: não encontrei a lixeira.`);
+      progress(pageDeleted ? `Página ${page}: cliquei na lixeira.` : `Página ${page}: não encontrei a lixeira.`);
       if (!pageDeleted) break;
 
       deleted = true;
       pagesDeleted += 1;
+      progress(`Página ${page} enviada para a lixeira. Total apagado: ${pagesDeleted}.`);
       await wait(2500);
 
       const changed = await waitFor(() => visibleRowsSnapshot() !== beforeKey, 7000);
@@ -292,7 +312,7 @@
       if (visibleMessageRows().length > 0) continue;
 
       const moved = goNextPageGmail();
-      debug(moved ? "Avançando para próxima página do remetente." : "Não há próxima página visível para este remetente.");
+      progress(moved ? "Avançando para próxima página do remetente." : "Fim das páginas para este remetente.");
       if (!moved) break;
 
       const nextReady = await waitForListView(8000);
@@ -307,8 +327,11 @@
       selected,
       deleted,
       pagesDeleted,
+      stopped,
       message: deleted
-        ? stoppedBecauseListDidNotChange
+        ? stopped
+          ? `${pagesDeleted} página(s) enviada(s) para a lixeira; parada solicitada.`
+          : stoppedBecauseListDidNotChange
           ? `${pagesDeleted} página(s) enviada(s) para a lixeira; parei porque a lista não mudou depois do clique.`
           : `${pagesDeleted} página(s) enviada(s) para a lixeira.`
         : "Não consegui enviar mensagens para a lixeira."
@@ -344,6 +367,15 @@
 
   function visibleRowsSnapshot() {
     return visibleMessageRows().map((row) => row.key).join("|");
+  }
+
+  async function shouldStopCleanup() {
+    try {
+      const { cleanupStopRequested } = await chrome.storage.local.get({ cleanupStopRequested: false });
+      return Boolean(cleanupStopRequested);
+    } catch {
+      return false;
+    }
   }
 
   function clickTrashButton() {
