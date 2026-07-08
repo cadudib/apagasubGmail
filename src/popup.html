@@ -10,7 +10,7 @@
     <main class="shell">
       <header class="topbar">
         <div>
-          <h1>Apaga Sub V1.45</h1>
+          <h1>Apaga Sub V1.46</h1>
           <p id="status">Escolha um termo pronto para preencher a busca do Gmail.</p>
         </div>
       </header>
@@ -67,8 +67,8 @@
         <div class="scan-options">
           <label for="scanLimit">Varrer</label>
           <select id="scanLimit">
-            <option value="10">10</option>
-            <option value="25" selected>25</option>
+            <option value="10" selected>10</option>
+            <option value="25">25</option>
             <option value="50">50</option>
           </select>
           <button id="nextPageButton" type="button" title="Clica no botão de próxima página do Gmail para continuar a navegação manual.">Próxima página</button>
@@ -97,6 +97,10 @@
         <label class="checkline option-check">
           <input id="confirmEachPage" type="checkbox" />
           <span>Confirmar cada página antes de apagar</span>
+        </label>
+        <label class="checkline option-check">
+          <input id="listOnlyScanInput" type="checkbox" />
+          <span>Varrer só a lista visível</span>
         </label>
         <p id="cleanupPreview" class="cleanup-preview">Modo seguro: depois do descadastro, a extensão só aplica o filtro do remetente.</p>
       </section>
@@ -131,6 +135,12 @@
         <textarea id="blockedDomainsInput" rows="4"></textarea>
         <label for="protectedKeywordsInput">Palavras protegidas</label>
         <textarea id="protectedKeywordsInput" rows="3"></textarea>
+        <label for="speedMode">Velocidade</label>
+        <select id="speedMode" title="Seguro usa esperas maiores. Rápido reduz pausas e timeouts.">
+          <option value="safe">Seguro</option>
+          <option value="normal" selected>Normal</option>
+          <option value="fast">Rápido</option>
+        </select>
         <label class="checkline option-check">
           <input id="requireDryRunInput" type="checkbox" />
           <span>Exigir simulação recente antes de apagar</span>

@@ -13,6 +13,8 @@ const scanLimitSelect = document.querySelector("#scanLimit");
 const cleanupModeSelect = document.querySelector("#cleanupMode");
 const cleanupPageLimitSelect = document.querySelector("#cleanupPageLimit");
 const confirmEachPageInput = document.querySelector("#confirmEachPage");
+const listOnlyScanInput = document.querySelector("#listOnlyScanInput");
+const speedModeSelect = document.querySelector("#speedMode");
 const uiModeSelect = document.querySelector("#uiMode");
 const moreActionsButton = document.querySelector("#moreActionsButton");
 const lastOperationTextEl = document.querySelector("#lastOperationText");
@@ -95,10 +97,10 @@ presetButtons.forEach((button) => {
   button.addEventListener("click", async () => {
     await runAction("Preenchendo a busca do Gmail...", async () => {
       await openGmailSearch(button.dataset.query);
-      await wait(3500);
+      await wait(uiDelay(3500));
       setStatus("Varrendo resultados encontrados...");
       clearDebug();
-      const response = await sendToGmail({ type: "scanPageGmail", limit: selectedScanLimit() });
+      const response = await sendToGmail({ type: "scanPageGmail", limit: selectedScanLimit(), listOnly: listOnlyScanInput.checked, speedMode: selectedSpeedMode() });
       subscriptions = await prepareSubscriptions(response.items || []);
       renderSubscriptions();
       setScanStatus(subscriptions);
@@ -119,7 +121,7 @@ deepScanButton.addEventListener("click", async () => {
   const limit = selectedScanLimit();
   await runAction(`Varrendo até ${limit} e-mails visíveis. Não mexa no Gmail até terminar...`, async () => {
     clearDebug();
-    const response = await sendToGmail({ type: "scanPageGmail", limit });
+    const response = await sendToGmail({ type: "scanPageGmail", limit, listOnly: listOnlyScanInput.checked, speedMode: selectedSpeedMode() });
     subscriptions = await prepareSubscriptions(response.items || []);
     renderSubscriptions();
     setScanStatus(subscriptions);
@@ -386,6 +388,8 @@ selectAll.addEventListener("change", () => {
 
 cleanupModeSelect.addEventListener("change", syncActions);
 cleanupPageLimitSelect.addEventListener("change", saveUiPrefs);
+speedModeSelect.addEventListener("change", saveUiPrefs);
+listOnlyScanInput.addEventListener("change", saveUiPrefs);
 uiModeSelect.addEventListener("change", () => {
   saveUiPrefs();
   applyUiVisibility();
@@ -417,14 +421,14 @@ async function openGmailSearch(query) {
     try {
       const response = await sendToGmail({ type: "runSearchGmail", query });
       if (response.searched) {
-        await wait(1000);
+      await wait(uiDelay(1000));
         return;
       }
       addDebug(`Busca não confirmou na tentativa ${attempt}; tentando novamente.`);
     } catch (error) {
       addDebug(`Busca pelo Gmail falhou na tentativa ${attempt}: ${error.message}`);
     }
-    await wait(1000);
+    await wait(uiDelay(1000));
   }
 
   const tab = await currentGmailTab();
@@ -516,11 +520,11 @@ async function runSenderCleanup(sender, { simulate, byDomain = false, pagination
 
   setStatus(`${simulate ? "Simulando" : "Filtrando"} ${target}...`);
   await openGmailSearch(query);
-  await wait(4000);
+  await wait(uiDelay(4000));
 
   setStatus(simulate ? `Contando paginação de ${target}...` : `Selecionando e apagando e-mails de ${target}...`);
   const mode = modeOverride || (simulate ? "simulate" : "auto");
-  const cleanupResponse = await sendToGmail({ type: "cleanupVisibleGmail", mode, sender: target, pageLimit, paginationOnly, confirmEachPage: confirmEachPageInput.checked });
+  const cleanupResponse = await sendToGmail({ type: "cleanupVisibleGmail", mode, sender: target, pageLimit, paginationOnly, confirmEachPage: confirmEachPageInput.checked, speedMode: selectedSpeedMode() });
   const cleanup = cleanupResponse.cleanup;
   cleanup.runId = runId;
   subscriptions = [];
@@ -723,10 +727,10 @@ async function cleanupAfterUnsubscribe(results) {
 
     setStatus(`Limpando e-mails de ${sender}...`);
     await openGmailSearch(`from:${sender}`);
-    await wait(4000);
+    await wait(uiDelay(4000));
 
     try {
-      const response = await sendToGmail({ type: "cleanupVisibleGmail", mode, sender, pageLimit: selectedCleanupPageLimit() });
+      const response = await sendToGmail({ type: "cleanupVisibleGmail", mode, sender, pageLimit: selectedCleanupPageLimit(), speedMode: selectedSpeedMode() });
       result.cleanup = response.cleanup || { attempted: false, sender, mode, message: "Limpeza sem resposta detalhada." };
       setCleanupSummary(result.cleanup);
       await saveCleanupHistory({ target: sender, query: `from:${sender}`, byDomain: false, cleanup: result.cleanup });
@@ -748,6 +752,13 @@ function isSafeHttpUrl(value) {
 
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function uiDelay(normalMs) {
+  const mode = selectedSpeedMode();
+  if (mode === "fast") return Math.max(250, Math.round(normalMs * 0.5));
+  if (mode === "safe") return Math.round(normalMs * 1.3);
+  return normalMs;
 }
 
 function selectedSubscriptions() {
@@ -974,6 +985,8 @@ async function loadSettings() {
   if (stored.uiPrefs?.tab) activeTab = stored.uiPrefs.tab;
   if (typeof stored.uiPrefs?.showMoreActions === "boolean") showMoreActions = stored.uiPrefs.showMoreActions;
   if (stored.uiPrefs?.cleanupPageLimit) cleanupPageLimitSelect.value = String(stored.uiPrefs.cleanupPageLimit);
+  if (stored.uiPrefs?.speedMode) speedModeSelect.value = stored.uiPrefs.speedMode;
+  if (typeof stored.uiPrefs?.listOnlyScan === "boolean") listOnlyScanInput.checked = stored.uiPrefs.listOnlyScan;
   applyUiVisibility();
 }
 
@@ -983,7 +996,9 @@ async function saveUiPrefs() {
       mode: uiModeSelect.value,
       tab: activeTab,
       showMoreActions,
-      cleanupPageLimit: selectedCleanupPageLimit()
+      cleanupPageLimit: selectedCleanupPageLimit(),
+      speedMode: selectedSpeedMode(),
+      listOnlyScan: listOnlyScanInput.checked
     }
   });
 }
@@ -1047,6 +1062,10 @@ function selectedScanLimit() {
 
 function selectedCleanupPageLimit() {
   return Number(cleanupPageLimitSelect.value || 20);
+}
+
+function selectedSpeedMode() {
+  return speedModeSelect.value || "normal";
 }
 
 function csvCell(value) {

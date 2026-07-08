@@ -1,8 +1,9 @@
 (() => {
-  if (globalThis.__apagaSubVersion === "1.45.0") return;
-  globalThis.__apagaSubVersion = "1.45.0";
+  if (globalThis.__apagaSubVersion === "1.46.0") return;
+  globalThis.__apagaSubVersion = "1.46.0";
 
   const TEXT_MATCH = /(unsubscribe|unsubscribe here|cancelar inscrição|cancelar inscri[cç][aã]o|cancelar assinatura|cancelar sua assinatura|cancelar subscrição|cancelar a subscri[cç][aã]o|descadastrar|descadastre|sair da lista|remover inscrição|remover inscri[cç][aã]o|gerenciar preferências|gerenciar preferencias)/i;
+  const scanSenderCache = new Set();
 
   // Message routing.
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -27,10 +28,10 @@
     if (message?.type === "getCurrentSenderGmail") return { ok: true, sender: bestVisibleSender() };
     if (message?.type === "diagnoseGmail") return { ok: true, diagnostic: diagnoseGmail() };
     if (message?.type === "scanVisibleGmail") return { ok: true, items: scanVisibleGmail() };
-    if (message?.type === "scanPageGmail") return { ok: true, items: await scanPageGmail(message.limit || 25) };
+    if (message?.type === "scanPageGmail") return { ok: true, items: await scanPageGmail(message.limit || 25, message.listOnly, message.speedMode || "normal") };
     if (message?.type === "goNextPageGmail") return { ok: true, moved: goNextPageGmail() };
     if (message?.type === "unsubscribeVisibleGmail") return { ok: true, results: await unsubscribeItems(message.items || [], message.cleanupMode || "safe") };
-    if (message?.type === "cleanupVisibleGmail") return { ok: true, cleanup: await cleanupVisibleMessages(message.mode || "safe", message.sender || "", message.pageLimit, message.paginationOnly, message.confirmEachPage) };
+    if (message?.type === "cleanupVisibleGmail") return { ok: true, cleanup: await cleanupVisibleMessages(message.mode || "safe", message.sender || "", message.pageLimit, message.paginationOnly, message.confirmEachPage, message.speedMode || "normal") };
     return { ok: false, error: "Ação desconhecida." };
   }
 
@@ -123,11 +124,17 @@
     return linkItemsFromOpenMessage();
   }
 
-  async function scanPageGmail(limit) {
+  async function scanPageGmail(limit, listOnly = false, speedMode = "normal") {
     const targets = visibleMessageRows()
       .slice(0, limit)
       .map((row) => ({ rowKey: row.key, sender: senderFromRow(row) }))
-      .filter((item) => item.sender.email || item.sender.name);
+      .filter((item) => item.sender.email || item.sender.name)
+      .filter((item) => {
+        const key = (item.sender.email || item.sender.name || "").toLowerCase();
+        if (!key || !scanSenderCache.has(key)) return true;
+        debug(`Pulando remetente já verificado nesta sessão: ${key}`);
+        return false;
+      });
     const results = [];
     const seen = new Set();
     debug(`Varredura iniciada: ${targets.length}/${limit} e-mails visíveis.`);
@@ -160,11 +167,26 @@
         continue;
       }
 
+      if (listOnly) {
+        const senderCacheKey = (target.sender.email || target.sender.name || "").toLowerCase();
+        results.push({
+          id: `missing:${results.length}`,
+          kind: "missing",
+          label: target.sender.name || target.sender.email,
+          detail: target.sender.email || "não aberto no modo lista",
+          rowKey: target.rowKey,
+          source: "lista apenas",
+          actionable: false
+        });
+        if (senderCacheKey) scanSenderCache.add(senderCacheKey);
+        continue;
+      }
+
       debug(`Abrindo e-mail: ${target.sender.name || target.sender.email}`);
       openMessageRow(row.element);
-      await wait(1800);
+      await wait(speedDelay(speedMode, 1800));
       await waitForMessageView();
-      await waitFor(() => findUnsubscribeElements().length > 0, 3000);
+      await waitFor(() => findUnsubscribeElements().length > 0, speedTimeout(speedMode, 3000));
 
       const links = linkItemsFromOpenMessage(target.sender, target.rowKey);
       if (links.length) {
@@ -239,7 +261,7 @@
     return { id: item.id, senderName: item.label, ok: false, message: "Use Varrer página para procurar o botão de descadastro." };
   }
 
-  async function cleanupVisibleMessages(mode, sender, pageLimit, paginationOnly = false, confirmEachPage = false) {
+  async function cleanupVisibleMessages(mode, sender, pageLimit, paginationOnly = false, confirmEachPage = false, speedMode = "normal") {
     mode = normalizeCleanupMode(mode);
     if (!sender) {
       debug("Limpeza ignorada: remetente sem e-mail claro.");
@@ -342,7 +364,7 @@
       const pageSelected = page === 1 ? true : await selectVisibleMessages();
       progress(pageSelected ? `Página ${page}: mensagens selecionadas.` : `Página ${page}: não consegui selecionar mensagens.`);
       if (!pageSelected) break;
-      await wait(1000);
+      await wait(speedDelay(speedMode, 1000));
 
       const visibleCount = visibleMessageRows().length;
       if (confirmEachPage && !confirm(`Apaga Sub: enviar para a lixeira a página ${page} com ${visibleCount} mensagem(ns)?`)) {
@@ -352,7 +374,7 @@
         break;
       }
 
-      const pageDeleted = await waitFor(() => clickTrashButton(), 7000);
+      const pageDeleted = await waitFor(() => clickTrashButton(), speedTimeout(speedMode, 7000));
       progress(pageDeleted ? `Página ${page}: cliquei na lixeira.` : `Página ${page}: não encontrei a lixeira.`);
       if (!pageDeleted) break;
 
@@ -360,9 +382,9 @@
       pagesDeleted += 1;
       pageReport.push({ page, count: visibleCount, deleted: true });
       progress(`Página ${page} enviada para a lixeira. Total apagado: ${pagesDeleted}.`);
-      await wait(2500);
+      await wait(speedDelay(speedMode, 2500));
 
-      const changed = await waitFor(() => visibleRowsSnapshot() !== beforeKey, 7000);
+      const changed = await waitFor(() => visibleRowsSnapshot() !== beforeKey, speedTimeout(speedMode, 7000));
       if (!changed && visibleMessageRows().length > 0) {
         stoppedBecauseListDidNotChange = true;
         stopReason = "lista não mudou após clique na lixeira";
@@ -380,9 +402,9 @@
       progress(moved ? "Avançando para próxima página do remetente." : "Fim das páginas para este remetente.");
       if (!moved) break;
 
-      const nextReady = await waitForListView(8000);
+      const nextReady = await waitForListView(speedTimeout(speedMode, 8000));
       if (!nextReady) break;
-      await wait(1200);
+      await wait(speedDelay(speedMode, 1200));
     }
 
     return {
@@ -890,6 +912,18 @@
 
   function wait(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  function speedDelay(mode, normalMs) {
+    if (mode === "fast") return Math.max(200, Math.round(normalMs * 0.45));
+    if (mode === "safe") return Math.round(normalMs * 1.35);
+    return normalMs;
+  }
+
+  function speedTimeout(mode, normalMs) {
+    if (mode === "fast") return Math.max(1200, Math.round(normalMs * 0.6));
+    if (mode === "safe") return Math.round(normalMs * 1.35);
+    return normalMs;
   }
 
   async function waitFor(predicate, timeout) {

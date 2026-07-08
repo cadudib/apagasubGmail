@@ -22,7 +22,7 @@ Ela nao pede senha, nao usa OAuth e nao exige Google Cloud. A extensao trabalha 
 
 1. Baixe a versao mais recente:
 
-   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.45.zip`
+   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.46.zip`
 
 2. Extraia o arquivo ZIP.
 
@@ -165,9 +165,17 @@ scripts/package.sh
 
 ## Versao atual
 
-V1.45
+V1.46
 
 ## Changelog
+
+### V1.46
+
+- Adiciona modo de velocidade `Seguro`, `Normal` e `Rapido`.
+- Troca esperas fixas principais por atrasos ajustados pelo perfil de velocidade.
+- Adiciona `Varrer so a lista visivel` para varredura mais rapida sem abrir e-mails.
+- Adiciona cache de remetentes verificados na sessao para pular repetidos.
+- Altera o padrao de varredura para 10 e-mails.
 
 ### V1.45
 
