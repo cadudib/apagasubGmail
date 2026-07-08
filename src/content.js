@@ -1,10 +1,11 @@
 (() => {
-  if (globalThis.__apagaSubVersion === "1.47.0") return;
-  globalThis.__apagaSubVersion = "1.47.0";
+  if (globalThis.__apagaSubVersion === "1.48.0") return;
+  globalThis.__apagaSubVersion = "1.48.0";
 
   const TEXT_MATCH = /(unsubscribe|unsubscribe here|cancelar inscrição|cancelar inscri[cç][aã]o|cancelar assinatura|cancelar sua assinatura|cancelar subscrição|cancelar a subscri[cç][aã]o|descadastrar|descadastre|sair da lista|remover inscrição|remover inscri[cç][aã]o|gerenciar preferências|gerenciar preferencias)/i;
   const scanSenderCache = new Set();
   let activeSpeedMode = "normal";
+  let activeOperation = "";
 
   // Message routing.
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -25,8 +26,22 @@
   }
 
   async function handleMessage(message) {
+    const lockKey = operationLockKey(message);
+    if (lockKey && activeOperation) return { ok: false, error: `Já existe uma ação em andamento no Gmail: ${activeOperation}.` };
+    if (lockKey) activeOperation = lockKey;
+    try {
+      return await handleMessageUnlocked(message);
+    } finally {
+      if (lockKey) activeOperation = "";
+    }
+  }
+
+  async function handleMessageUnlocked(message) {
     if (message?.type === "fillSearchGmail") return { ok: true, filled: fillSearchGmail(message.query || "") };
-    if (message?.type === "runSearchGmail") return { ok: true, searched: await runSearchGmail(message.query || "") };
+    if (message?.type === "runSearchGmail") {
+      activeSpeedMode = message.speedMode || "normal";
+      return { ok: true, searched: await runSearchGmail(message.query || "") };
+    }
     if (message?.type === "getCurrentSenderGmail") return { ok: true, sender: bestVisibleSender() };
     if (message?.type === "diagnoseGmail") return { ok: true, diagnostic: diagnoseGmail() };
     if (message?.type === "scanVisibleGmail") return { ok: true, items: scanVisibleGmail() };
@@ -41,6 +56,12 @@
       return { ok: true, cleanup: await cleanupVisibleMessages(message.mode || "safe", message.sender || "", message.pageLimit, message.paginationOnly, message.confirmEachPage, activeSpeedMode) };
     }
     return { ok: false, error: "Ação desconhecida." };
+  }
+
+  function operationLockKey(message) {
+    if (!message?.type) return "";
+    if (["scanPageGmail", "unsubscribeVisibleGmail", "cleanupVisibleGmail", "runSearchGmail"].includes(message.type)) return message.type;
+    return "";
   }
 
   function fillSearchGmail(query) {
@@ -66,13 +87,15 @@
       }
     }
 
-    await wait(1200);
+    await waitForGmailIdle(speedTimeout(activeSpeedMode, 3000));
+    await wait(speedDelay(activeSpeedMode, 450));
     if (searchLooksActive(query)) return true;
 
     const searchButton = findSearchButton(searchBox);
     if (searchButton) {
       activateElement(searchButton);
-      await wait(1800);
+      await waitForGmailIdle(speedTimeout(activeSpeedMode, 4500));
+      await wait(speedDelay(activeSpeedMode, 650));
     }
 
     return searchLooksActive(query);
@@ -277,10 +300,14 @@
     }
 
     debug(`Limpando mensagens visíveis (${mode}): ${sender}`);
-    const listReady = await waitForListView(10000);
+    const listReady = await waitForListOrEmpty(speedTimeout(speedMode, 10000));
     if (!listReady) {
       debug(`Limpeza falhou: lista não carregou para ${sender}.`);
       return { attempted: true, sender, mode, selected: false, deleted: false, pagesDeleted: 0, message: "A busca do remetente não carregou a lista a tempo." };
+    }
+    if (visibleMessageRows().length === 0 && searchLooksEmpty()) {
+      progress(`Nenhuma mensagem encontrada para ${sender}; pulando alvo.`);
+      return { attempted: true, sender, mode, selected: false, deleted: false, pagesDeleted: 0, messagesDeleted: 0, pagesSkipped: 1, message: "Nenhuma mensagem encontrada para este remetente." };
     }
 
     if (mode === "safe") {
@@ -312,13 +339,14 @@
           hasNextPage = false;
           break;
         }
-        const nextReady = await waitForListView(8000);
+        const nextReady = await waitForListOrEmpty(speedTimeout(speedMode, 8000));
         if (!nextReady) {
           hasNextPage = false;
           progress(`Página ${page + 1}: não carregou a tempo.`);
           break;
         }
-        await wait(1000);
+        await waitForGmailIdle(speedTimeout(speedMode, 2500));
+        await wait(speedDelay(speedMode, 600));
       }
 
       const message = `Simulação: ${visibleCount} mensagem(ns) em ${pagesSeen} página(s); próxima página final: ${hasNextPage ? "sim" : "não"}.`;
@@ -354,6 +382,8 @@
 
     let deleted = false;
     let pagesDeleted = 0;
+    let messagesDeleted = 0;
+    let pagesSkipped = 0;
     let stoppedBecauseListDidNotChange = false;
     let stopped = false;
     let stopReason = "";
@@ -370,8 +400,19 @@
         break;
       }
       const beforeKey = visibleRowsSnapshot();
+      const visibleBeforeSelect = visibleMessageRows().length;
+      if (visibleBeforeSelect === 0) {
+        pagesSkipped += 1;
+        progress(`Página ${page}: vazia, procurando próxima.`);
+        const movedFromEmpty = goNextPageGmail();
+        if (!movedFromEmpty) break;
+        const emptyNextReady = await waitForListOrEmpty(speedTimeout(speedMode, 8000));
+        if (!emptyNextReady) break;
+        await waitForGmailIdle(speedTimeout(speedMode, 2500));
+        continue;
+      }
       const pageSelected = page === 1 ? true : await selectVisibleMessages();
-      progress(pageSelected ? `Página ${page}: mensagens selecionadas.` : `Página ${page}: não consegui selecionar mensagens.`);
+      progress(pageSelected ? `Página ${page}/${maxPages}: ${visibleBeforeSelect} mensagem(ns) selecionada(s).` : `Página ${page}/${maxPages}: não consegui selecionar mensagens.`);
       if (!pageSelected) break;
       await wait(speedDelay(speedMode, 1000));
 
@@ -389,8 +430,10 @@
 
       deleted = true;
       pagesDeleted += 1;
+      messagesDeleted += visibleCount;
       pageReport.push({ page, count: visibleCount, deleted: true });
-      progress(`Página ${page} enviada para a lixeira. Total apagado: ${pagesDeleted}.`);
+      progress(`Página ${page} enviada para a lixeira. Total: ${pagesDeleted} página(s), ${messagesDeleted} mensagem(ns).`);
+      await waitForGmailIdle(speedTimeout(speedMode, adaptivePause));
       await wait(adaptivePause);
 
       const changed = speedMode === "fast" && visibleMessageRows().length === 0
@@ -416,7 +459,8 @@
 
       const nextReady = await waitForListView(speedTimeout(speedMode, 8000));
       if (!nextReady) break;
-      await wait(speedDelay(speedMode, 1200));
+      await waitForGmailIdle(speedTimeout(speedMode, 2500));
+      await wait(speedDelay(speedMode, 700));
     }
 
     return {
@@ -426,6 +470,8 @@
       selected,
       deleted,
       pagesDeleted,
+      messagesDeleted,
+      pagesSkipped,
       stopped,
       stopReason,
       pageReport,
@@ -436,7 +482,7 @@
           ? `${pagesDeleted} página(s) enviada(s) para a lixeira; parei porque a lista não mudou depois do clique.`
           : pagesDeleted >= maxPages
           ? `${pagesDeleted} página(s) enviada(s) para a lixeira; limite atingido.`
-          : `${pagesDeleted} página(s) enviada(s) para a lixeira.`
+          : `${pagesDeleted} página(s) e ${messagesDeleted} mensagem(ns) enviada(s) para a lixeira.`
         : "Não consegui enviar mensagens para a lixeira."
     };
   }
@@ -457,14 +503,15 @@
     const selectBox = findTopSelectBox();
     if (!selectBox) return false;
     activateElement(selectBox);
-    await wait(700);
+    await wait(speedDelay(activeSpeedMode, 700));
 
     const choseAll = await chooseAllFromSelectionMenu();
     if (choseAll) {
       debug("Opção Todos selecionada no menu do Gmail.");
-      await wait(1800);
+      await wait(speedDelay(activeSpeedMode, 1800));
     }
 
+    await waitFor(() => selectionLooksActive() || Boolean(findToolbarTrashButton()), speedTimeout(activeSpeedMode, 2500));
     return Boolean(findToolbarTrashButton()) || choseAll;
   }
 
@@ -900,7 +947,44 @@
   }
 
   async function waitForListView(timeout = 5000) {
-    return waitFor(() => visibleMessageRows().length > 0, timeout);
+    return waitFor(async () => {
+      if (isGmailLoading()) return false;
+      return visibleMessageRows().length > 0;
+    }, timeout);
+  }
+
+  async function waitForListOrEmpty(timeout = 5000) {
+    return waitFor(async () => {
+      if (isGmailLoading()) return false;
+      return visibleMessageRows().length > 0 || searchLooksEmpty();
+    }, timeout);
+  }
+
+  async function waitForGmailIdle(timeout = 3000, stableMs = 350) {
+    const started = Date.now();
+    let stableSince = 0;
+    while (Date.now() - started < timeout) {
+      if (!isGmailLoading()) {
+        stableSince ||= Date.now();
+        if (Date.now() - stableSince >= stableMs) return true;
+      } else {
+        stableSince = 0;
+      }
+      await wait(120);
+    }
+    return false;
+  }
+
+  function isGmailLoading() {
+    const candidates = [...document.querySelectorAll('[role="progressbar"], [aria-busy="true"], .vO, .aDP, .loading')];
+    if (candidates.some(isVisible)) return true;
+    const text = cleanText(document.body?.innerText || "").slice(0, 3000);
+    return /\b(loading|carregando|atualizando)\b/i.test(text) && !visibleMessageRows().length;
+  }
+
+  function searchLooksEmpty() {
+    const text = cleanText(document.body?.innerText || "");
+    return /no messages matched your search|nenhuma mensagem corresponde|nenhum resultado encontrado|não encontrou nenhum resultado/i.test(text);
   }
 
   function normalizeHref(href) {
@@ -927,12 +1011,14 @@
   }
 
   function speedDelay(mode, normalMs) {
+    if (mode === "turbo") return Math.max(120, Math.round(normalMs * 0.28));
     if (mode === "fast") return Math.max(200, Math.round(normalMs * 0.45));
     if (mode === "safe") return Math.round(normalMs * 1.35);
     return normalMs;
   }
 
   function speedTimeout(mode, normalMs) {
+    if (mode === "turbo") return Math.max(900, Math.round(normalMs * 0.45));
     if (mode === "fast") return Math.max(1200, Math.round(normalMs * 0.6));
     if (mode === "safe") return Math.round(normalMs * 1.35);
     return normalMs;
@@ -941,7 +1027,7 @@
   async function waitFor(predicate, timeout) {
     const started = Date.now();
     while (Date.now() - started < timeout) {
-      if (predicate()) return true;
+      if (await predicate()) return true;
       await wait(250);
     }
     return false;

@@ -22,7 +22,7 @@ Ela nao pede senha, nao usa OAuth e nao exige Google Cloud. A extensao trabalha 
 
 1. Baixe a versao mais recente:
 
-   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.47.zip`
+   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.48.zip`
 
 2. Extraia o arquivo ZIP.
 
@@ -165,9 +165,17 @@ scripts/package.sh
 
 ## Versao atual
 
-V1.47
+V1.48
 
 ## Changelog
+
+### V1.48
+
+- Adiciona velocidade `Turbo seguro` para reduzir pausas mantendo checagem do carregamento do Gmail.
+- Troca mais esperas fixas por espera inteligente quando o Gmail termina de carregar.
+- Bloqueia clique duplo/reentrada enquanto uma acao ja esta em andamento.
+- Pula alvo vazio automaticamente quando a busca do remetente nao encontra mensagens.
+- Mostra progresso com pagina e estimativa de mensagens enviadas para a lixeira.
 
 ### V1.47
 

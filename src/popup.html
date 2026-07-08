@@ -10,7 +10,7 @@
     <main class="shell">
       <header class="topbar">
         <div>
-          <h1>Apaga Sub V1.47</h1>
+          <h1>Apaga Sub V1.48</h1>
           <p id="status">Escolha um termo pronto para preencher a busca do Gmail.</p>
         </div>
       </header>
@@ -136,10 +136,11 @@
         <label for="protectedKeywordsInput">Palavras protegidas</label>
         <textarea id="protectedKeywordsInput" rows="3"></textarea>
         <label for="speedMode">Velocidade</label>
-        <select id="speedMode" title="Seguro usa esperas maiores. Rápido reduz pausas e timeouts.">
+        <select id="speedMode" title="Seguro usa esperas maiores. Rápido reduz pausas. Turbo usa esperas mínimas com checagem de carregamento do Gmail.">
           <option value="safe">Seguro</option>
           <option value="normal" selected>Normal</option>
           <option value="fast">Rápido</option>
+          <option value="turbo">Turbo seguro</option>
         </select>
         <label class="checkline option-check">
           <input id="requireDryRunInput" type="checkbox" />

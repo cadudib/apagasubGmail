@@ -97,7 +97,7 @@ presetButtons.forEach((button) => {
   button.addEventListener("click", async () => {
     await runAction("Preenchendo a busca do Gmail...", async () => {
       await openGmailSearch(button.dataset.query);
-      await wait(uiDelay(3500));
+      await wait(uiDelay(1200));
       setStatus("Varrendo resultados encontrados...");
       clearDebug();
       const response = await sendToGmail({ type: "scanPageGmail", limit: selectedScanLimit(), listOnly: listOnlyScanInput.checked, speedMode: selectedSpeedMode() });
@@ -168,7 +168,7 @@ backupJsonButton.addEventListener("click", async () => {
   const debug = [...debugLogEl.children].map((item) => item.textContent);
   const backup = {
     exportedAt: new Date().toISOString(),
-    version: "V1.43",
+    version: "V1.48",
     settings: {
       blockedDomains: stored.blockedDomains,
       protectedKeywords: stored.protectedKeywords,
@@ -419,16 +419,16 @@ batchDeleteButton.addEventListener("click", async () => {
 async function openGmailSearch(query) {
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     try {
-      const response = await sendToGmail({ type: "runSearchGmail", query });
+      const response = await sendToGmail({ type: "runSearchGmail", query, speedMode: selectedSpeedMode() });
       if (response.searched) {
-      await wait(uiDelay(1000));
+      await wait(uiDelay(450));
         return;
       }
       addDebug(`Busca não confirmou na tentativa ${attempt}; tentando novamente.`);
     } catch (error) {
       addDebug(`Busca pelo Gmail falhou na tentativa ${attempt}: ${error.message}`);
     }
-    await wait(uiDelay(1000));
+    await wait(uiDelay(600));
   }
 
   const tab = await currentGmailTab();
@@ -473,6 +473,10 @@ async function currentGmailTab() {
 }
 
 async function runAction(message, action) {
+  if (busy) {
+    setStatus("Já existe uma ação em andamento. Aguarde terminar ou clique em Parar.", "error");
+    return;
+  }
   await chrome.storage.local.set({ cleanupStopRequested: false });
   setBusy(true);
   setStatus(message);
@@ -520,7 +524,7 @@ async function runSenderCleanup(sender, { simulate, byDomain = false, pagination
 
   setStatus(`${simulate ? "Simulando" : "Filtrando"} ${target}...`);
   await openGmailSearch(query);
-  await wait(uiDelay(4000));
+  await wait(uiDelay(900));
 
   setStatus(simulate ? `Contando paginação de ${target}...` : `Selecionando e apagando e-mails de ${target}...`);
   const mode = modeOverride || (simulate ? "simulate" : "auto");
@@ -727,7 +731,7 @@ async function cleanupAfterUnsubscribe(results) {
 
     setStatus(`Limpando e-mails de ${sender}...`);
     await openGmailSearch(`from:${sender}`);
-    await wait(uiDelay(4000));
+    await wait(uiDelay(900));
 
     try {
       const response = await sendToGmail({ type: "cleanupVisibleGmail", mode, sender, pageLimit: selectedCleanupPageLimit(), speedMode: selectedSpeedMode() });
@@ -756,6 +760,7 @@ function wait(ms) {
 
 function uiDelay(normalMs) {
   const mode = selectedSpeedMode();
+  if (mode === "turbo") return Math.max(150, Math.round(normalMs * 0.3));
   if (mode === "fast") return Math.max(250, Math.round(normalMs * 0.5));
   if (mode === "safe") return Math.round(normalMs * 1.3);
   return normalMs;
@@ -854,8 +859,9 @@ function setRunSummary(results) {
   const cleanups = results.map((result) => result.cleanup).filter(Boolean);
   const cleaned = cleanups.filter((cleanup) => cleanup.attempted).length;
   const pages = cleanups.reduce((total, cleanup) => total + Number(cleanup.pagesDeleted || 0), 0);
+  const messages = cleanups.reduce((total, cleanup) => total + Number(cleanup.messagesDeleted || 0), 0);
   const stopped = cleanups.some((cleanup) => cleanup.stopped);
-  summaryTextEl.textContent = `${confirmed} confirmado(s), ${manual} precisa(m) confirmação manual, ${failed} falhou(aram), ${cleaned} limpeza(s), ${pages} página(s) apagada(s)${stopped ? ", parada solicitada" : ""}.`;
+  summaryTextEl.textContent = `${confirmed} confirmado(s), ${manual} precisa(m) confirmação manual, ${failed} falhou(aram), ${cleaned} limpeza(s), ${pages} página(s), ${messages} mensagem(ns) apagada(s)${stopped ? ", parada solicitada" : ""}.`;
 }
 
 function setCleanupSummary(cleanup) {
@@ -865,7 +871,7 @@ function setCleanupSummary(cleanup) {
     markGuideDone(cleanup.paginationOnly ? "guidePage" : "guideSimulate");
     return;
   }
-  summaryTextEl.textContent = `Limpeza: ${cleanup.pagesDeleted || 0} página(s) apagada(s), selecionou: ${cleanup.selected ? "sim" : "não"}, apagou: ${cleanup.deleted ? "sim" : "não"}${cleanup.stopped ? ", parada solicitada" : ""}.`;
+  summaryTextEl.textContent = `Limpeza: ${cleanup.pagesDeleted || 0} página(s), ${cleanup.messagesDeleted || 0} mensagem(ns), selecionou: ${cleanup.selected ? "sim" : "não"}, apagou: ${cleanup.deleted ? "sim" : "não"}${cleanup.stopped ? ", parada solicitada" : ""}.`;
   if (cleanup.deleted) markGuideDone("guideDelete");
 }
 
@@ -897,6 +903,7 @@ async function saveCleanupHistory({ target, query, byDomain, cleanup }) {
     mode: cleanup.mode || "auto",
     simulated: Boolean(cleanup.simulated),
     pagesDeleted: Number(cleanup.pagesDeleted || 0),
+    messagesDeleted: Number(cleanup.messagesDeleted || 0),
     visibleCount: Number(cleanup.visibleCount || 0),
     pagesSeen: Number(cleanup.pagesSeen || 0),
     hasNextPage: Boolean(cleanup.hasNextPage),
@@ -921,6 +928,7 @@ async function saveRunReport({ runId, target, query, byDomain, cleanup, simulate
     simulated: Boolean(simulate),
     limit: pageLimit,
     pagesDeleted: Number(cleanup?.pagesDeleted || 0),
+    messagesDeleted: Number(cleanup?.messagesDeleted || 0),
     visibleCount: Number(cleanup?.visibleCount || 0),
     pagesSeen: Number(cleanup?.pagesSeen || 0),
     deleted: Boolean(cleanup?.deleted),
