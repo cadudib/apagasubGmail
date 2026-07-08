@@ -13,6 +13,8 @@ const scanLimitSelect = document.querySelector("#scanLimit");
 const cleanupModeSelect = document.querySelector("#cleanupMode");
 const cleanupPageLimitSelect = document.querySelector("#cleanupPageLimit");
 const confirmEachPageInput = document.querySelector("#confirmEachPage");
+const uiModeSelect = document.querySelector("#uiMode");
+const lastOperationTextEl = document.querySelector("#lastOperationText");
 const unsubscribeButton = document.querySelector("#unsubscribeButton");
 const stopActionButton = document.querySelector("#stopActionButton");
 const batchSimulateButton = document.querySelector("#batchSimulateButton");
@@ -36,11 +38,13 @@ const importSettingsButton = document.querySelector("#importSettingsButton");
 const selectAll = document.querySelector("#selectAll");
 const template = document.querySelector("#subscriptionTemplate");
 const presetButtons = document.querySelectorAll(".preset-button");
+const tabButtons = document.querySelectorAll(".tab-button");
 
 let subscriptions = [];
 let busy = false;
 let blockedDomains = [];
 let protectedKeywords = [];
+let activeTab = "search";
 
 const DEFAULT_BLOCKED_DOMAINS = [
   "google.com",
@@ -65,6 +69,8 @@ blockedDomains = [...DEFAULT_BLOCKED_DOMAINS];
 protectedKeywords = [...DEFAULT_PROTECTED_KEYWORDS];
 loadSettings();
 renderHistory();
+restoreLastOperation();
+applyUiVisibility();
 
 chrome.runtime.onMessage.addListener((message) => {
   if (message?.type === "debugEvent") {
@@ -232,6 +238,7 @@ filterSenderButton.addEventListener("click", async () => {
     subscriptions = [];
     renderSubscriptions();
     setStatus(`Filtro aplicado: ${query}. Agora selecione e apague em lote no Gmail.`);
+    markGuideDone("guideFilter");
   });
 });
 
@@ -263,7 +270,8 @@ diagnosticButton.addEventListener("click", async () => {
   await runAction("Executando diagnóstico do Gmail...", async () => {
     const response = await sendToGmail({ type: "diagnoseGmail" });
     const info = response.diagnostic;
-    const message = `Diagnóstico: busca ${yesNo(info.searchBox)}, linhas ${info.rows}, seleção ${yesNo(info.selectBox)}, lixeira ${yesNo(info.trashButton)}, próxima ${yesNo(info.nextPageButton)}.`;
+    const nextDetail = info.nextPageButton ? ` (${info.nextPageLabel || "sem rótulo"}${info.nextPageDisabled ? ", desativada" : ""})` : "";
+    const message = `Diagnóstico: busca ${yesNo(info.searchBox)}, linhas ${info.rows}, seleção ${yesNo(info.selectBox)}, lixeira ${yesNo(info.trashButton)}, próxima ${yesNo(info.nextPageButton)}${nextDetail}.`;
     addDebug(message);
     setStatus(message);
   });
@@ -324,6 +332,13 @@ selectAll.addEventListener("change", () => {
 });
 
 cleanupModeSelect.addEventListener("change", syncActions);
+uiModeSelect.addEventListener("change", applyUiVisibility);
+tabButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    activeTab = button.dataset.tab || "search";
+    applyUiVisibility();
+  });
+});
 
 batchSimulateButton.addEventListener("click", async () => {
   await runBatchCleanup({ simulate: true });
@@ -707,6 +722,7 @@ function setBusy(isBusy) {
 function setStatus(message, type = "normal") {
   statusEl.textContent = message;
   statusEl.className = type;
+  saveLastOperation(message, type);
 }
 
 function setScanStatus(items) {
@@ -734,9 +750,11 @@ function setCleanupSummary(cleanup) {
   if (!cleanup) return;
   if (cleanup.simulated) {
     summaryTextEl.textContent = `Simulação: ${cleanup.visibleCount || 0} mensagem(ns), ${cleanup.pagesSeen || 1} página(s), próxima página: ${cleanup.hasNextPage ? "sim" : "não"}.`;
+    markGuideDone(cleanup.paginationOnly ? "guidePage" : "guideSimulate");
     return;
   }
   summaryTextEl.textContent = `Limpeza: ${cleanup.pagesDeleted || 0} página(s) apagada(s), selecionou: ${cleanup.selected ? "sim" : "não"}, apagou: ${cleanup.deleted ? "sim" : "não"}${cleanup.stopped ? ", parada solicitada" : ""}.`;
+  if (cleanup.deleted) markGuideDone("guideDelete");
 }
 
 async function saveHistory(results) {
@@ -953,4 +971,38 @@ function addDebug(message) {
 
 function clearDebug() {
   debugLogEl.innerHTML = "";
+}
+
+function applyUiVisibility() {
+  const isAdvanced = uiModeSelect.value === "advanced";
+  tabButtons.forEach((button) => {
+    button.setAttribute("aria-selected", String((button.dataset.tab || "search") === activeTab));
+  });
+  document.querySelectorAll("[data-group]").forEach((element) => {
+    const sameGroup = (element.dataset.group || "").split(/\s+/).includes(activeTab);
+    const advancedAllowed = isAdvanced || element.dataset.advanced !== "true";
+    element.hidden = !sameGroup || !advancedAllowed;
+  });
+  document.querySelectorAll("[data-group-panel]").forEach((element) => {
+    const groups = (element.dataset.groupPanel || "").split(/\s+/);
+    element.hidden = !groups.includes(activeTab);
+  });
+}
+
+function markGuideDone(id) {
+  const item = document.querySelector(`#${id}`);
+  if (item) item.dataset.done = "true";
+}
+
+async function saveLastOperation(message, type = "normal") {
+  if (!message) return;
+  const lastOperation = { at: new Date().toISOString(), message, type };
+  if (lastOperationTextEl) lastOperationTextEl.textContent = `Última: ${message}`;
+  await chrome.storage.local.set({ lastOperation });
+}
+
+async function restoreLastOperation() {
+  const { lastOperation } = await chrome.storage.local.get({ lastOperation: null });
+  if (!lastOperation?.message || !lastOperationTextEl) return;
+  lastOperationTextEl.textContent = `Última: ${lastOperation.message}`;
 }

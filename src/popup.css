@@ -90,6 +90,65 @@ button:disabled {
   border-bottom: 1px solid var(--border);
 }
 
+.tabbar,
+.mode-panel {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.tabbar {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.tab-button {
+  min-height: 32px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.tab-button[aria-selected="true"] {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #ffffff;
+}
+
+.mode-panel {
+  grid-template-columns: auto minmax(110px, 1fr) 1.8fr;
+  align-items: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.guide-panel {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 10px 12px;
+}
+
+.guide-panel strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+
+.guide-panel ol {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.guide-panel li[data-done="true"] {
+  color: var(--success);
+}
+
+[hidden] {
+  display: none !important;
+}
+
 h1 {
   margin: 0 0 4px;
   font-size: 20px;

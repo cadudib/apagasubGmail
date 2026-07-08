@@ -10,10 +10,37 @@
     <main class="shell">
       <header class="topbar">
         <div>
-          <h1>Apaga Sub V1.41</h1>
+          <h1>Apaga Sub V1.42</h1>
           <p id="status">Escolha um termo pronto para preencher a busca do Gmail.</p>
         </div>
       </header>
+
+      <nav class="tabbar" aria-label="Áreas da extensão">
+        <button class="tab-button" type="button" data-tab="search">Buscar</button>
+        <button class="tab-button" type="button" data-tab="clean">Limpar</button>
+        <button class="tab-button" type="button" data-tab="batch">Lote</button>
+        <button class="tab-button" type="button" data-tab="config">Config</button>
+        <button class="tab-button" type="button" data-tab="debug">Debug</button>
+      </nav>
+
+      <section class="mode-panel">
+        <label for="uiMode">Modo</label>
+        <select id="uiMode" title="Simples mostra só o fluxo seguro básico. Avançado mostra todos os controles.">
+          <option value="simple" selected>Simples</option>
+          <option value="advanced">Avançado</option>
+        </select>
+        <span id="lastOperationText">Nenhuma operação anterior.</span>
+      </section>
+
+      <section class="guide-panel">
+        <strong>Checklist seguro</strong>
+        <ol>
+          <li id="guideFilter">Filtrar remetente</li>
+          <li id="guidePage">Testar paginação</li>
+          <li id="guideSimulate">Simular apagar</li>
+          <li id="guideDelete">Apagar página atual ou aumentar limite</li>
+        </ol>
+      </section>
 
       <section class="controls">
         <div class="preset-grid">
@@ -25,16 +52,16 @@
           <button class="preset-button" type="button" data-query='newer_than:1y (notification OR digest OR updates OR newsletter)' title="Busca mensagens em inglês como digests, updates e newsletters.">Inglês</button>
         </div>
         <div class="scan-row">
-          <button id="filterSenderButton" type="button" title="Pega o remetente do e-mail aberto e aplica uma busca from: no Gmail. Não apaga nada.">Filtrar remetente</button>
-          <button id="testPaginationButton" type="button" title="Testa a paginação do remetente em modo simulação, sem selecionar nem apagar mensagens.">Testar paginação</button>
-          <button id="simulateDeleteSenderButton" type="button" title="Simula quantas mensagens/páginas seriam processadas para o remetente atual. Não apaga nada.">Simular apagar</button>
-          <button id="deleteCurrentPageButton" type="button" title="Filtra o remetente atual e apaga somente a página visível, com confirmação.">Apagar pág. atual</button>
-          <button id="quarantineButton" type="button" title="Filtra o remetente atual e seleciona mensagens visíveis para você revisar/manualizar. Não apaga.">Quarentena</button>
-          <button id="diagnosticButton" type="button" title="Testa se a extensão encontra busca, linhas, seleção, lixeira e próxima página no Gmail atual.">Diagnóstico</button>
-          <button id="deleteSenderButton" type="button" title="Filtra o remetente atual e apaga mensagens visíveis até o limite configurado.">Filtrar e apagar</button>
-          <button id="deleteDomainButton" type="button" title="Busca pelo domínio inteiro do remetente atual e apaga mensagens visíveis até o limite. Use com cuidado.">Apagar domínio</button>
-          <button id="scanButton" type="button" title="Lista as linhas visíveis do Gmail sem procurar links de descadastro.">Ver linhas</button>
-          <button id="deepScanButton" type="button" title="Abre/verifica e-mails visíveis procurando botões ou links de descadastro.">Varrer página</button>
+          <button id="filterSenderButton" data-group="search" type="button" title="Pega o remetente do e-mail aberto e aplica uma busca from: no Gmail. Não apaga nada.">Filtrar remetente</button>
+          <button id="testPaginationButton" data-group="search" type="button" title="Testa a paginação do remetente em modo simulação, sem selecionar nem apagar mensagens.">Testar paginação</button>
+          <button id="simulateDeleteSenderButton" data-group="clean" type="button" title="Simula quantas mensagens/páginas seriam processadas para o remetente atual. Não apaga nada.">Simular apagar</button>
+          <button id="deleteCurrentPageButton" data-group="clean" type="button" title="Filtra o remetente atual e apaga somente a página visível, com confirmação.">Apagar pág. atual</button>
+          <button id="quarantineButton" data-group="clean" data-advanced="true" type="button" title="Filtra o remetente atual e seleciona mensagens visíveis para você revisar/manualizar. Não apaga.">Quarentena</button>
+          <button id="diagnosticButton" data-group="debug" type="button" title="Testa se a extensão encontra busca, linhas, seleção, lixeira e próxima página no Gmail atual.">Diagnóstico</button>
+          <button id="deleteSenderButton" data-group="clean" data-advanced="true" type="button" title="Filtra o remetente atual e apaga mensagens visíveis até o limite configurado.">Filtrar e apagar</button>
+          <button id="deleteDomainButton" data-group="clean" data-advanced="true" type="button" title="Busca pelo domínio inteiro do remetente atual e apaga mensagens visíveis até o limite. Use com cuidado.">Apagar domínio</button>
+          <button id="scanButton" data-group="search" type="button" title="Lista as linhas visíveis do Gmail sem procurar links de descadastro.">Ver linhas</button>
+          <button id="deepScanButton" data-group="search" data-advanced="true" type="button" title="Abre/verifica e-mails visíveis procurando botões ou links de descadastro.">Varrer página</button>
         </div>
         <div class="scan-options">
           <label for="scanLimit">Varrer</label>
@@ -73,7 +100,7 @@
         <p id="cleanupPreview" class="cleanup-preview">Modo seguro: depois do descadastro, a extensão só aplica o filtro do remetente.</p>
       </section>
 
-      <section class="bulk-actions">
+      <section class="bulk-actions" data-group-panel="batch">
         <label class="checkline">
           <input id="selectAll" type="checkbox" />
           <span>Selecionar tudo</span>
@@ -86,18 +113,18 @@
 
       <section id="results" class="results" aria-live="polite"></section>
 
-      <section class="summary-panel">
+      <section class="summary-panel" data-group-panel="clean debug">
         <strong>Resumo</strong>
         <p id="summaryText">Nenhuma execução nesta sessão.</p>
       </section>
 
-      <section class="summary-panel">
+      <section class="summary-panel" data-group-panel="clean batch debug">
         <strong>Histórico</strong>
         <button id="openTrashButton" type="button" title="Abre a Lixeira do Gmail já filtrada pelo último remetente ou domínio processado.">Abrir lixeira filtrada</button>
         <ul id="historyLog" class="history-log"></ul>
       </section>
 
-      <section class="summary-panel settings-panel">
+      <section class="summary-panel settings-panel" data-group-panel="config">
         <strong>Configurações</strong>
         <label for="blockedDomainsInput">Domínios bloqueados</label>
         <textarea id="blockedDomainsInput" rows="4"></textarea>
@@ -110,12 +137,12 @@
         <button id="saveSettingsButton" type="button" title="Salva a lista editável de domínios bloqueados.">Salvar configurações</button>
       </section>
 
-      <section class="summary-panel help-panel">
+      <section class="summary-panel help-panel" data-group-panel="search clean">
         <strong>Ajuda</strong>
         <p>Fluxo seguro: teste paginação, simule, apague página atual, depois aumente o limite. Use Quarentena para selecionar sem apagar.</p>
       </section>
 
-      <section class="debug-panel">
+      <section class="debug-panel" data-group-panel="debug">
         <div class="debug-header">
           <strong>Debug</strong>
           <span>

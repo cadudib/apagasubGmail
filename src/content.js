@@ -1,6 +1,6 @@
 (() => {
-  if (globalThis.__apagaSubVersion === "1.41.0") return;
-  globalThis.__apagaSubVersion = "1.41.0";
+  if (globalThis.__apagaSubVersion === "1.42.0") return;
+  globalThis.__apagaSubVersion = "1.42.0";
 
   const TEXT_MATCH = /(unsubscribe|unsubscribe here|cancelar inscrição|cancelar inscri[cç][aã]o|cancelar assinatura|cancelar sua assinatura|cancelar subscrição|cancelar a subscri[cç][aã]o|descadastrar|descadastre|sair da lista|remover inscrição|remover inscri[cç][aã]o|gerenciar preferências|gerenciar preferencias)/i;
 
@@ -73,12 +73,15 @@
   }
 
   function diagnoseGmail() {
+    const nextButton = findNextPageButton();
     return {
       searchBox: Boolean(findSearchBox()),
       rows: visibleMessageRows().length,
       selectBox: Boolean(findTopSelectBox()),
       trashButton: Boolean(findToolbarTrashButton()),
-      nextPageButton: Boolean(findNextPageButton()),
+      nextPageButton: Boolean(nextButton),
+      nextPageLabel: nextButton ? controlLabelText(nextButton) || elementSearchText(nextButton) : "",
+      nextPageDisabled: nextButton ? nextButton.getAttribute("aria-disabled") === "true" : false,
       hash: location.hash
     };
   }

@@ -22,7 +22,7 @@ Ela nao pede senha, nao usa OAuth e nao exige Google Cloud. A extensao trabalha 
 
 1. Baixe a versao mais recente:
 
-   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.41.zip`
+   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.42.zip`
 
 2. Extraia o arquivo ZIP.
 
@@ -142,9 +142,17 @@ scripts/package.sh
 
 ## Versao atual
 
-V1.41
+V1.42
 
 ## Changelog
+
+### V1.42
+
+- Organiza ações por abas: Buscar, Limpar, Lote, Config e Debug.
+- Adiciona modo `Simples`/`Avançado` para reduzir ruído visual.
+- Adiciona checklist guiado do fluxo seguro.
+- Salva e mostra a última operação do popup.
+- Melhora diagnóstico de paginação com rótulo e estado do botão detectado.
 
 ### V1.41
 
