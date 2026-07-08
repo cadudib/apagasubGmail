@@ -10,29 +10,29 @@
     <main class="shell">
       <header class="topbar">
         <div>
-          <h1>Apaga Sub V1.39</h1>
+          <h1>Apaga Sub V1.40</h1>
           <p id="status">Escolha um termo pronto para preencher a busca do Gmail.</p>
         </div>
       </header>
 
       <section class="controls">
         <div class="preset-grid">
-          <button class="preset-button" type="button" data-query="category:promotions newer_than:1y unsubscribe">Promoções</button>
-          <button class="preset-button" type="button" data-query='newer_than:1y (unsubscribe OR "cancelar inscrição" OR descadastrar)'>Newsletters</button>
-          <button class="preset-button" type="button" data-query='newer_than:6m ("sair da lista" OR "gerenciar preferências" OR unsubscribe)'>Últimos 6 meses</button>
-          <button class="preset-button" type="button" data-query='newer_than:1y (oferta OR promoção OR cupom OR desconto OR sale)'>Lojas</button>
-          <button class="preset-button" type="button" data-query='newer_than:1y (webinar OR curso OR aula OR treinamento OR newsletter)'>Cursos</button>
-          <button class="preset-button" type="button" data-query='newer_than:1y (notification OR digest OR updates OR newsletter)'>Inglês</button>
+          <button class="preset-button" type="button" data-query="category:promotions newer_than:1y unsubscribe" title="Busca promoções recentes com possível link de descadastro e inicia varredura.">Promoções</button>
+          <button class="preset-button" type="button" data-query='newer_than:1y (unsubscribe OR "cancelar inscrição" OR descadastrar)' title="Busca newsletters recentes com termos de descadastro e inicia varredura.">Newsletters</button>
+          <button class="preset-button" type="button" data-query='newer_than:6m ("sair da lista" OR "gerenciar preferências" OR unsubscribe)' title="Busca mensagens dos últimos 6 meses com termos comuns de saída de lista.">Últimos 6 meses</button>
+          <button class="preset-button" type="button" data-query='newer_than:1y (oferta OR promoção OR cupom OR desconto OR sale)' title="Busca ofertas, promoções, cupons e lojas recentes.">Lojas</button>
+          <button class="preset-button" type="button" data-query='newer_than:1y (webinar OR curso OR aula OR treinamento OR newsletter)' title="Busca cursos, webinars, aulas e newsletters de treinamento.">Cursos</button>
+          <button class="preset-button" type="button" data-query='newer_than:1y (notification OR digest OR updates OR newsletter)' title="Busca mensagens em inglês como digests, updates e newsletters.">Inglês</button>
         </div>
         <div class="scan-row">
-          <button id="filterSenderButton" type="button">Filtrar remetente</button>
-          <button id="testPaginationButton" type="button">Testar paginação</button>
-          <button id="simulateDeleteSenderButton" type="button">Simular apagar</button>
-          <button id="deleteCurrentPageButton" type="button">Apagar pág. atual</button>
-          <button id="deleteSenderButton" type="button">Filtrar e apagar</button>
-          <button id="deleteDomainButton" type="button">Apagar domínio</button>
-          <button id="scanButton" type="button">Ver linhas</button>
-          <button id="deepScanButton" type="button">Varrer página</button>
+          <button id="filterSenderButton" type="button" title="Pega o remetente do e-mail aberto e aplica uma busca from: no Gmail. Não apaga nada.">Filtrar remetente</button>
+          <button id="testPaginationButton" type="button" title="Testa a paginação do remetente em modo simulação, sem selecionar nem apagar mensagens.">Testar paginação</button>
+          <button id="simulateDeleteSenderButton" type="button" title="Simula quantas mensagens/páginas seriam processadas para o remetente atual. Não apaga nada.">Simular apagar</button>
+          <button id="deleteCurrentPageButton" type="button" title="Filtra o remetente atual e apaga somente a página visível, com confirmação.">Apagar pág. atual</button>
+          <button id="deleteSenderButton" type="button" title="Filtra o remetente atual e apaga mensagens visíveis até o limite configurado.">Filtrar e apagar</button>
+          <button id="deleteDomainButton" type="button" title="Busca pelo domínio inteiro do remetente atual e apaga mensagens visíveis até o limite. Use com cuidado.">Apagar domínio</button>
+          <button id="scanButton" type="button" title="Lista as linhas visíveis do Gmail sem procurar links de descadastro.">Ver linhas</button>
+          <button id="deepScanButton" type="button" title="Abre/verifica e-mails visíveis procurando botões ou links de descadastro.">Varrer página</button>
         </div>
         <div class="scan-options">
           <label for="scanLimit">Varrer</label>
@@ -41,7 +41,7 @@
             <option value="25" selected>25</option>
             <option value="50">50</option>
           </select>
-          <button id="nextPageButton" type="button">Próxima página</button>
+          <button id="nextPageButton" type="button" title="Clica no botão de próxima página do Gmail para continuar a navegação manual.">Próxima página</button>
         </div>
         <div class="scan-options">
           <label for="cleanupMode">Após sair</label>
@@ -64,6 +64,10 @@
           </select>
           <span class="option-note">Por remetente/domínio</span>
         </div>
+        <label class="checkline option-check">
+          <input id="confirmEachPage" type="checkbox" />
+          <span>Confirmar cada página antes de apagar</span>
+        </label>
         <p id="cleanupPreview" class="cleanup-preview">Modo seguro: depois do descadastro, a extensão só aplica o filtro do remetente.</p>
       </section>
 
@@ -72,10 +76,10 @@
           <input id="selectAll" type="checkbox" />
           <span>Selecionar tudo</span>
         </label>
-        <button id="stopActionButton" type="button" disabled>Parar</button>
-        <button id="batchSimulateButton" type="button" disabled>Simular lote</button>
-        <button id="batchDeleteButton" type="button" disabled>Apagar lote</button>
-        <button id="unsubscribeButton" type="button" disabled>Sair das selecionadas</button>
+        <button id="stopActionButton" type="button" disabled title="Solicita parada da limpeza automática após a etapa atual terminar.">Parar</button>
+        <button id="batchSimulateButton" type="button" disabled title="Simula limpeza para os remetentes selecionados na lista de resultados.">Simular lote</button>
+        <button id="batchDeleteButton" type="button" disabled title="Apaga em lote os remetentes selecionados, respeitando bloqueios e limite de páginas.">Apagar lote</button>
+        <button id="unsubscribeButton" type="button" disabled title="Tenta sair das assinaturas selecionadas e depois executa a limpeza configurada em Após sair.">Sair das selecionadas</button>
       </section>
 
       <section id="results" class="results" aria-live="polite"></section>
@@ -87,7 +91,7 @@
 
       <section class="summary-panel">
         <strong>Histórico</strong>
-        <button id="openTrashButton" type="button">Abrir lixeira filtrada</button>
+        <button id="openTrashButton" type="button" title="Abre a Lixeira do Gmail já filtrada pelo último remetente ou domínio processado.">Abrir lixeira filtrada</button>
         <ul id="historyLog" class="history-log"></ul>
       </section>
 
@@ -95,16 +99,17 @@
         <strong>Configurações</strong>
         <label for="blockedDomainsInput">Domínios bloqueados</label>
         <textarea id="blockedDomainsInput" rows="4"></textarea>
-        <button id="saveSettingsButton" type="button">Salvar configurações</button>
+        <button id="saveSettingsButton" type="button" title="Salva a lista editável de domínios bloqueados.">Salvar configurações</button>
       </section>
 
       <section class="debug-panel">
         <div class="debug-header">
           <strong>Debug</strong>
           <span>
-            <button id="exportLogButton" type="button">Exportar</button>
-            <button id="copyDebugButton" type="button">Copiar</button>
-            <button id="clearDebugButton" type="button">Limpar</button>
+            <button id="exportLogButton" type="button" title="Copia um relatório em texto com resumo, histórico e debug.">Exportar</button>
+            <button id="exportCsvButton" type="button" title="Copia o histórico de limpezas em formato CSV.">CSV</button>
+            <button id="copyDebugButton" type="button" title="Copia apenas o debug da sessão atual.">Copiar</button>
+            <button id="clearDebugButton" type="button" title="Limpa o debug exibido no popup.">Limpar</button>
           </span>
         </div>
         <ol id="debugLog" class="debug-log"></ol>

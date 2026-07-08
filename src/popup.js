@@ -10,6 +10,7 @@ const nextPageButton = document.querySelector("#nextPageButton");
 const scanLimitSelect = document.querySelector("#scanLimit");
 const cleanupModeSelect = document.querySelector("#cleanupMode");
 const cleanupPageLimitSelect = document.querySelector("#cleanupPageLimit");
+const confirmEachPageInput = document.querySelector("#confirmEachPage");
 const unsubscribeButton = document.querySelector("#unsubscribeButton");
 const stopActionButton = document.querySelector("#stopActionButton");
 const batchSimulateButton = document.querySelector("#batchSimulateButton");
@@ -23,6 +24,7 @@ const historyLogEl = document.querySelector("#historyLog");
 const clearDebugButton = document.querySelector("#clearDebugButton");
 const copyDebugButton = document.querySelector("#copyDebugButton");
 const exportLogButton = document.querySelector("#exportLogButton");
+const exportCsvButton = document.querySelector("#exportCsvButton");
 const openTrashButton = document.querySelector("#openTrashButton");
 const blockedDomainsInput = document.querySelector("#blockedDomainsInput");
 const saveSettingsButton = document.querySelector("#saveSettingsButton");
@@ -127,6 +129,32 @@ exportLogButton.addEventListener("click", async () => {
   ].join("\n");
   await navigator.clipboard.writeText(report);
   setStatus("Log exportado para a área de transferência.");
+});
+
+exportCsvButton.addEventListener("click", async () => {
+  const { cleanupHistory } = await chrome.storage.local.get({ cleanupHistory: [] });
+  const rows = [
+    ["data", "tipo", "alvo", "query", "limite", "modo", "simulado", "paginas", "mensagens_visiveis", "apagou", "parou", "motivo"]
+  ];
+  for (const entry of cleanupHistory) {
+    rows.push([
+      entry.at || "",
+      entry.type || "",
+      entry.target || "",
+      entry.query || "",
+      entry.limit ?? "",
+      entry.mode || "",
+      entry.simulated ? "sim" : "nao",
+      entry.pagesDeleted ?? 0,
+      entry.visibleCount ?? 0,
+      entry.deleted ? "sim" : "nao",
+      entry.stopped ? "sim" : "nao",
+      entry.stopReason || entry.message || ""
+    ]);
+  }
+  const csv = rows.map((row) => row.map(csvCell).join(",")).join("\n");
+  await navigator.clipboard.writeText(csv);
+  setStatus("Histórico CSV copiado para a área de transferência.");
 });
 
 stopActionButton.addEventListener("click", async () => {
@@ -354,7 +382,7 @@ async function runSenderCleanup(sender, { simulate, byDomain = false, pagination
   await wait(4000);
 
   setStatus(simulate ? `Contando paginação de ${target}...` : `Selecionando e apagando e-mails de ${target}...`);
-  const cleanupResponse = await sendToGmail({ type: "cleanupVisibleGmail", mode: simulate ? "simulate" : "auto", sender: target, pageLimit, paginationOnly });
+  const cleanupResponse = await sendToGmail({ type: "cleanupVisibleGmail", mode: simulate ? "simulate" : "auto", sender: target, pageLimit, paginationOnly, confirmEachPage: confirmEachPageInput.checked });
   const cleanup = cleanupResponse.cleanup;
   subscriptions = [];
   renderSubscriptions();
@@ -379,16 +407,37 @@ async function runBatchCleanup({ simulate }) {
   }
   const limit = selectedCleanupPageLimit();
   const limitText = limit === 0 ? "até acabar" : `${limit} página(s)`;
-  if (!simulate && !confirm(`Executar apagar lote para ${runnable.length} remetente(s)?\n\nLimite por remetente: ${limitText}\n\nContinuar?`)) return;
+  const preview = runnable.slice(0, 12).join("\n");
+  const blockedText = blocked.length ? `\n\nBloqueados/ignorados:\n${blocked.slice(0, 8).join("\n")}` : "";
+  if (!simulate && !confirm(`Executar apagar lote para ${runnable.length} remetente(s)?\n\nLimite por remetente: ${limitText}\n\nRemetentes:\n${preview}${runnable.length > 12 ? "\n..." : ""}${blockedText}\n\nContinuar?`)) return;
 
   await runAction(simulate ? "Simulando lote..." : "Apagando lote...", async () => {
+    renderBatchQueue(runnable, "pendente");
     for (const [index, email] of runnable.entries()) {
       setStatus(`${simulate ? "Simulando" : "Apagando"} ${index + 1}/${runnable.length}: ${email}`);
+      updateBatchQueue(email, "processando");
       await runSenderCleanup({ email }, { simulate });
+      updateBatchQueue(email, "concluído");
       if (await stopRequested()) break;
     }
     setStatus(simulate ? "Simulação em lote concluída." : "Limpeza em lote concluída.");
   });
+}
+
+function renderBatchQueue(emails, state) {
+  resultsEl.innerHTML = '<div class="batch-queue"></div>';
+  const queue = resultsEl.querySelector(".batch-queue");
+  for (const email of emails) {
+    const item = document.createElement("div");
+    item.dataset.email = email;
+    item.textContent = `${email}: ${state}`;
+    queue.appendChild(item);
+  }
+}
+
+function updateBatchQueue(email, state) {
+  const item = resultsEl.querySelector(`[data-email="${CSS.escape(email)}"]`);
+  if (item) item.textContent = `${email}: ${state}`;
 }
 
 function renderSubscriptions() {
@@ -659,6 +708,9 @@ async function saveCleanupHistory({ target, query, byDomain, cleanup }) {
     simulated: Boolean(cleanup.simulated),
     pagesDeleted: Number(cleanup.pagesDeleted || 0),
     visibleCount: Number(cleanup.visibleCount || 0),
+    pagesSeen: Number(cleanup.pagesSeen || 0),
+    hasNextPage: Boolean(cleanup.hasNextPage),
+    pageReport: cleanup.pageReport || [],
     deleted: Boolean(cleanup.deleted),
     stopped: Boolean(cleanup.stopped),
     stopReason: cleanup.stopReason || cleanup.message || "",
@@ -749,6 +801,10 @@ function selectedScanLimit() {
 
 function selectedCleanupPageLimit() {
   return Number(cleanupPageLimitSelect.value || 20);
+}
+
+function csvCell(value) {
+  return `"${String(value ?? "").replace(/"/g, '""')}"`;
 }
 
 function confirmCleanupMode(items) {

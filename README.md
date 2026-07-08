@@ -22,7 +22,7 @@ Ela nao pede senha, nao usa OAuth e nao exige Google Cloud. A extensao trabalha 
 
 1. Baixe a versao mais recente:
 
-   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.39.zip`
+   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.40.zip`
 
 2. Extraia o arquivo ZIP.
 
@@ -142,9 +142,17 @@ scripts/package.sh
 
 ## Versao atual
 
-V1.39
+V1.40
 
 ## Changelog
+
+### V1.40
+
+- Salva relatório persistente dos testes/simulações de paginação no histórico.
+- Adiciona `Confirmar cada página antes de apagar`.
+- Mostra prévia detalhada antes de executar lote.
+- Mostra fila visual simples durante lote.
+- Adiciona exportação CSV do histórico de limpezas.
 
 ### V1.39
 

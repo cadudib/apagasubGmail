@@ -308,10 +308,16 @@ input[type="checkbox"] {
   font-size: 12px;
 }
 
+.option-check {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 #batchSimulateButton,
 #batchDeleteButton,
 #openTrashButton,
-#saveSettingsButton {
+#saveSettingsButton,
+#exportCsvButton {
   min-height: 30px;
   padding: 0 8px;
   font-size: 12px;
@@ -363,4 +369,17 @@ textarea {
 
 .history-log li {
   overflow-wrap: anywhere;
+}
+
+.batch-queue {
+  display: grid;
+  gap: 6px;
+}
+
+.batch-queue div {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 8px;
+  font-size: 12px;
 }

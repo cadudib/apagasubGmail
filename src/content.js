@@ -1,6 +1,6 @@
 (() => {
-  if (globalThis.__apagaSubVersion === "1.39.0") return;
-  globalThis.__apagaSubVersion = "1.39.0";
+  if (globalThis.__apagaSubVersion === "1.40.0") return;
+  globalThis.__apagaSubVersion = "1.40.0";
 
   const TEXT_MATCH = /(unsubscribe|unsubscribe here|cancelar inscrição|cancelar inscri[cç][aã]o|cancelar assinatura|cancelar sua assinatura|cancelar subscrição|cancelar a subscri[cç][aã]o|descadastrar|descadastre|sair da lista|remover inscrição|remover inscri[cç][aã]o|gerenciar preferências|gerenciar preferencias)/i;
 
@@ -28,7 +28,7 @@
     if (message?.type === "scanPageGmail") return { ok: true, items: await scanPageGmail(message.limit || 25) };
     if (message?.type === "goNextPageGmail") return { ok: true, moved: goNextPageGmail() };
     if (message?.type === "unsubscribeVisibleGmail") return { ok: true, results: await unsubscribeItems(message.items || [], message.cleanupMode || "safe") };
-    if (message?.type === "cleanupVisibleGmail") return { ok: true, cleanup: await cleanupVisibleMessages(message.mode || "safe", message.sender || "", message.pageLimit, message.paginationOnly) };
+    if (message?.type === "cleanupVisibleGmail") return { ok: true, cleanup: await cleanupVisibleMessages(message.mode || "safe", message.sender || "", message.pageLimit, message.paginationOnly, message.confirmEachPage) };
     return { ok: false, error: "Ação desconhecida." };
   }
 
@@ -222,7 +222,7 @@
     return { id: item.id, senderName: item.label, ok: false, message: "Use Varrer página para procurar o botão de descadastro." };
   }
 
-  async function cleanupVisibleMessages(mode, sender, pageLimit, paginationOnly = false) {
+  async function cleanupVisibleMessages(mode, sender, pageLimit, paginationOnly = false, confirmEachPage = false) {
     mode = normalizeCleanupMode(mode);
     if (!sender) {
       debug("Limpeza ignorada: remetente sem e-mail claro.");
@@ -246,6 +246,7 @@
       let pagesSeen = 0;
       let visibleCount = 0;
       let hasNextPage = false;
+      const pageReport = [];
 
       progress(`Teste de paginação: limite ${maxPages === 100 ? "até acabar" : `${maxPages} página(s)`}.`);
       for (let page = 1; page <= maxPages; page += 1) {
@@ -253,6 +254,7 @@
         pagesSeen += 1;
         visibleCount += count;
         hasNextPage = Boolean(findNextPageButton());
+        pageReport.push({ page, count, hasNextPage });
         progress(`Página ${page}: ${count} mensagem(ns); próxima página: ${hasNextPage ? "sim" : "não"}.`);
         if (!hasNextPage) break;
         if (!paginationOnly && page >= maxPages) break;
@@ -274,7 +276,7 @@
 
       const message = `Simulação: ${visibleCount} mensagem(ns) em ${pagesSeen} página(s); próxima página final: ${hasNextPage ? "sim" : "não"}.`;
       progress(message);
-      return { attempted: true, sender, mode, simulated: true, paginationOnly, visibleCount, pagesSeen, hasNextPage, pagesDeleted: 0, deleted: false, message };
+      return { attempted: true, sender, mode, simulated: true, paginationOnly, visibleCount, pagesSeen, hasNextPage, pageReport, pagesDeleted: 0, deleted: false, message };
     }
 
     const selected = await selectVisibleMessages();
@@ -308,6 +310,7 @@
     let stoppedBecauseListDidNotChange = false;
     let stopped = false;
     let stopReason = "";
+    const pageReport = [];
     const maxPages = normalizePageLimit(pageLimit);
     progress(`Limite desta limpeza: ${maxPages === 100 ? "até acabar" : `${maxPages} página(s)`}.`);
 
@@ -324,12 +327,21 @@
       if (!pageSelected) break;
       await wait(1000);
 
+      const visibleCount = visibleMessageRows().length;
+      if (confirmEachPage && !confirm(`Apaga Sub: enviar para a lixeira a página ${page} com ${visibleCount} mensagem(ns)?`)) {
+        stopped = true;
+        stopReason = "usuário cancelou confirmação da página";
+        progress(`Página ${page}: cancelada pelo usuário.`);
+        break;
+      }
+
       const pageDeleted = await waitFor(() => clickTrashButton(), 7000);
       progress(pageDeleted ? `Página ${page}: cliquei na lixeira.` : `Página ${page}: não encontrei a lixeira.`);
       if (!pageDeleted) break;
 
       deleted = true;
       pagesDeleted += 1;
+      pageReport.push({ page, count: visibleCount, deleted: true });
       progress(`Página ${page} enviada para a lixeira. Total apagado: ${pagesDeleted}.`);
       await wait(2500);
 
@@ -365,6 +377,7 @@
       pagesDeleted,
       stopped,
       stopReason,
+      pageReport,
       message: deleted
         ? stopped
           ? `${pagesDeleted} página(s) enviada(s) para a lixeira; parada solicitada.`
