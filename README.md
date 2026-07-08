@@ -134,6 +134,12 @@ node --check src/popup.js
 node --check src/content.js
 ```
 
+Para gerar o ZIP de instalacao com o `manifest.json` na raiz:
+
+```bash
+scripts/package.sh
+```
+
 ## Versao atual
 
 V1.26
