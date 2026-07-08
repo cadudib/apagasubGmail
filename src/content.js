@@ -1,6 +1,6 @@
 (() => {
-  if (globalThis.__apagaSubVersion === "1.33.0") return;
-  globalThis.__apagaSubVersion = "1.33.0";
+  if (globalThis.__apagaSubVersion === "1.34.0") return;
+  globalThis.__apagaSubVersion = "1.34.0";
 
   const TEXT_MATCH = /(unsubscribe|unsubscribe here|cancelar inscrição|cancelar inscri[cç][aã]o|cancelar assinatura|cancelar sua assinatura|cancelar subscrição|cancelar a subscri[cç][aã]o|descadastrar|descadastre|sair da lista|remover inscrição|remover inscri[cç][aã]o|gerenciar preferências|gerenciar preferencias)/i;
 
@@ -284,7 +284,7 @@
     const choseAll = await chooseAllFromSelectionMenu();
     if (choseAll) {
       debug("Opção Todos selecionada no menu do Gmail.");
-      await wait(900);
+      await wait(1800);
     }
 
     return Boolean(findToolbarTrashButton()) || choseAll;
@@ -292,19 +292,42 @@
 
   function clickTrashButton() {
     const trashButton = findToolbarTrashButton();
-    if (!trashButton) return false;
+    if (!trashButton) {
+      debugToolbarControls();
+      return false;
+    }
+    debug(`Clicando lixeira: ${controlLabelText(trashButton) || elementSearchText(trashButton) || trashButton.getAttribute("act") || "controle sem rótulo"}`);
     activateElement(trashButton);
     return true;
   }
 
   function findToolbarTrashButton() {
-    return [...document.querySelectorAll("[aria-label], [data-tooltip], [role='button'], div[role='button']")]
+    const direct = [
+      ...document.querySelectorAll(
+        'div[act="10"], [act="10"], [data-tooltip="Delete"], [data-tooltip="Excluir"], [data-tooltip*="Move to trash"], [data-tooltip*="Mover para a lixeira"], [aria-label="Delete"], [aria-label="Excluir"], [aria-label*="Move to trash"], [aria-label*="Mover para a lixeira"]'
+      )
+    ]
+      .filter(isVisible)
+      .filter(isToolbarControl)[0];
+    if (direct) return direct;
+
+    return [...document.querySelectorAll("[aria-label], [data-tooltip], [role='button'], div[role='button'], [act]")]
       .filter(isVisible)
       .filter(isToolbarControl)
       .find((element) => {
         const text = controlLabelText(element);
-        return /^(delete|trash|excluir|mover para a lixeira|move to trash)$/i.test(text) || /delete|mover para a lixeira|move to trash/i.test(text);
+        return /^(delete|excluir|mover para a lixeira|mover para lixeira|move to trash)$/i.test(text) || /delete|excluir|mover para a lixeira|mover para lixeira|move to trash/i.test(text);
       }) || null;
+  }
+
+  function debugToolbarControls() {
+    const labels = [...document.querySelectorAll("[aria-label], [data-tooltip], [role='button'], div[role='button'], [act]")]
+      .filter(isVisible)
+      .filter(isToolbarControl)
+      .map((element) => controlLabelText(element) || elementSearchText(element) || `act:${element.getAttribute("act") || ""}`)
+      .filter(Boolean)
+      .slice(0, 12);
+    debug(labels.length ? `Controles superiores visíveis: ${labels.join(" | ")}` : "Nenhum controle superior visível para excluir.");
   }
 
   async function chooseAllFromSelectionMenu() {

@@ -22,7 +22,7 @@ Ela nao pede senha, nao usa OAuth e nao exige Google Cloud. A extensao trabalha 
 
 1. Baixe a versao mais recente:
 
-   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.33.zip`
+   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.34.zip`
 
 2. Extraia o arquivo ZIP.
 
@@ -142,9 +142,14 @@ scripts/package.sh
 
 ## Versao atual
 
-V1.33
+V1.34
 
 ## Changelog
+
+### V1.34
+
+- Amplia a detecção do botão de excluir do Gmail com seletores específicos como `act="10"`, `Delete`, `Excluir` e `Mover para a lixeira`.
+- Adiciona debug dos controles superiores quando a lixeira não é encontrada.
 
 ### V1.33
 
