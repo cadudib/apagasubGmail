@@ -112,6 +112,7 @@ Esta extensao nao usa a API oficial do Gmail. Por isso:
 - Ela depende da interface visual do Gmail.
 - Mudancas no layout do Gmail podem exigir ajustes.
 - Alguns descadastros abrem paginas externas e precisam de confirmacao manual.
+- Links externos de descadastro sao abertos somente quando usam `http:` ou `https:`.
 - Alguns e-mails escondem o descadastro em rodapes, imagens ou paginas externas.
 - A varredura trabalha por pagina visivel, nao pela caixa inteira de uma vez.
 
@@ -125,7 +126,7 @@ Arquivos principais:
 - `src/popup.js`: logica do popup.
 - `src/content.js`: automacao executada dentro do Gmail.
 
-Validacao rapida:
+Depois de alterar `src/popup.js` ou `src/content.js`, rode a validacao rapida:
 
 ```bash
 node --check src/popup.js

@@ -170,12 +170,13 @@
   }
 
   async function unsubscribeItems(items, cleanupMode) {
+    cleanupMode = normalizeCleanupMode(cleanupMode);
     const results = [];
     debug(`Descadastro iniciado: ${items.length} item(ns). Limpeza: ${cleanupMode}.`);
     for (const item of items) {
       debug(`Processando saída: ${item.label || item.detail || item.id}`);
       const result = await processUnsubscribeItem(item);
-      if (result.ok && cleanupMode !== "off") {
+      if (result.ok && !result.urlToOpen && cleanupMode !== "off") {
         await cleanupSenderEmails(item, cleanupMode);
       }
       results.push(result);
@@ -183,6 +184,10 @@
     }
     debug("Descadastro finalizado.");
     return results;
+  }
+
+  function normalizeCleanupMode(mode) {
+    return ["safe", "semi", "auto", "off"].includes(mode) ? mode : "safe";
   }
 
   async function processUnsubscribeItem(item) {

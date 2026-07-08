@@ -128,12 +128,24 @@ async function openGmailSearch(query) {
 async function sendToGmail(message) {
   const tab = await currentGmailTab();
 
-  await chrome.scripting.executeScript({
-    target: { tabId: tab.id },
-    files: ["src/content.js"]
-  });
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ["src/content.js"]
+    });
+  } catch (error) {
+    throw new Error(`Não consegui ativar a extensão no Gmail: ${error.message}`);
+  }
 
-  const response = await chrome.tabs.sendMessage(tab.id, message);
+  let response;
+  try {
+    response = await chrome.tabs.sendMessage(tab.id, message);
+  } catch (error) {
+    throw new Error(`Não consegui falar com a aba do Gmail: ${error.message}`);
+  }
+  if (!response) {
+    throw new Error("A aba do Gmail não respondeu. Recarregue a página e tente novamente.");
+  }
   if (!response?.ok) {
     throw new Error(response?.error || "Não consegui ler o Gmail. Recarregue a página e tente novamente.");
   }
@@ -154,6 +166,7 @@ async function runAction(message, action) {
   try {
     await action();
   } catch (error) {
+    resetProcessingItems();
     setStatus(error.message, "error");
   } finally {
     setBusy(false);
@@ -180,7 +193,7 @@ function renderSubscriptions() {
     checkbox.disabled = item.actionable === false;
     checkbox.addEventListener("change", syncActions);
     article.addEventListener("click", (event) => {
-      if (event.target === checkbox || checkbox.disabled) return;
+      if (event.target.closest(".subscription-main") || checkbox.disabled) return;
       checkbox.checked = !checkbox.checked;
       syncActions();
     });
@@ -236,12 +249,38 @@ function markItemsProcessing(items) {
   }
 }
 
+function resetProcessingItems() {
+  document.querySelectorAll('.subscription[data-state="processing"]').forEach((article) => {
+    article.dataset.state = "ready";
+    article.querySelector(".subscription-mode").textContent = "pronto";
+  });
+}
+
 async function openResultTabs(results) {
   for (const result of results) {
     if (result.urlToOpen) {
-      await chrome.tabs.create({ url: result.urlToOpen, active: false });
-      result.message = "Link de descadastro aberto.";
+      if (!isSafeHttpUrl(result.urlToOpen)) {
+        result.ok = false;
+        result.message = "Link de descadastro bloqueado por protocolo inseguro.";
+        continue;
+      }
+      try {
+        await chrome.tabs.create({ url: result.urlToOpen, active: false });
+        result.message = "Link de descadastro aberto.";
+      } catch (error) {
+        result.ok = false;
+        result.message = `Não consegui abrir o link de descadastro: ${error.message}`;
+      }
     }
+  }
+}
+
+function isSafeHttpUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
   }
 }
 
