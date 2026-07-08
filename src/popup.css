@@ -52,6 +52,7 @@ button:disabled {
 #scanButton,
 #deepScanButton,
 #filterSenderButton,
+#deleteSenderButton,
 #nextPageButton,
 #unsubscribeButton {
   border-color: var(--primary);
@@ -62,6 +63,7 @@ button:disabled {
 #scanButton:hover,
 #deepScanButton:hover,
 #filterSenderButton:hover,
+#deleteSenderButton:hover,
 #nextPageButton:hover,
 #unsubscribeButton:hover {
   background: var(--primary-hover);
@@ -108,7 +110,7 @@ p {
 
 .scan-row {
   display: grid;
-  grid-template-columns: 1.3fr 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 

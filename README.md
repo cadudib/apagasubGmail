@@ -22,7 +22,7 @@ Ela nao pede senha, nao usa OAuth e nao exige Google Cloud. A extensao trabalha 
 
 1. Baixe a versao mais recente:
 
-   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.30.zip`
+   `https://avancard.c3n0.com.br/projeto/EXTCHROME/apagasub-V1.31.zip`
 
 2. Extraia o arquivo ZIP.
 
@@ -142,9 +142,14 @@ scripts/package.sh
 
 ## Versao atual
 
-V1.30
+V1.31
 
 ## Changelog
+
+### V1.31
+
+- Adiciona o botão `Filtrar e apagar` para buscar o remetente do e-mail aberto e enviar automaticamente as mensagens visíveis desse remetente para a lixeira.
+- Exige e-mail claro do remetente antes da limpeza automática direta.
 
 ### V1.30
 

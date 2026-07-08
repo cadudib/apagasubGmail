@@ -1,6 +1,7 @@
 const scanButton = document.querySelector("#scanButton");
 const deepScanButton = document.querySelector("#deepScanButton");
 const filterSenderButton = document.querySelector("#filterSenderButton");
+const deleteSenderButton = document.querySelector("#deleteSenderButton");
 const nextPageButton = document.querySelector("#nextPageButton");
 const scanLimitSelect = document.querySelector("#scanLimit");
 const cleanupModeSelect = document.querySelector("#cleanupMode");
@@ -89,6 +90,32 @@ filterSenderButton.addEventListener("click", async () => {
     subscriptions = [];
     renderSubscriptions();
     setStatus(`Filtro aplicado: ${query}. Agora selecione e apague em lote no Gmail.`);
+  });
+});
+
+deleteSenderButton.addEventListener("click", async () => {
+  await runAction("Pegando remetente para apagar...", async () => {
+    const response = await sendToGmail({ type: "getCurrentSenderGmail" });
+    const sender = response.sender;
+    if (!sender?.email) {
+      throw new Error("Abra um e-mail com remetente visível para apagar automaticamente por endereço.");
+    }
+    if (!confirm(`Filtrar e enviar para a lixeira os e-mails visíveis de:\n\n${sender.email}\n\nContinuar?`)) {
+      setStatus("Ação cancelada.");
+      return;
+    }
+
+    const query = `from:${sender.email}`;
+    setStatus(`Filtrando ${sender.email}...`);
+    await openGmailSearch(query);
+    await wait(4000);
+
+    setStatus(`Selecionando e apagando e-mails de ${sender.email}...`);
+    const cleanupResponse = await sendToGmail({ type: "cleanupVisibleGmail", mode: "auto", sender: sender.email });
+    const cleanup = cleanupResponse.cleanup;
+    subscriptions = [];
+    renderSubscriptions();
+    setStatus(cleanup?.message || `Limpeza concluída para ${sender.email}.`, cleanup?.deleted ? "normal" : "error");
   });
 });
 
@@ -363,6 +390,7 @@ function setBusy(busy) {
   scanButton.disabled = busy;
   deepScanButton.disabled = busy;
   filterSenderButton.disabled = busy;
+  deleteSenderButton.disabled = busy;
   nextPageButton.disabled = busy;
   scanLimitSelect.disabled = busy;
   cleanupModeSelect.disabled = busy;
