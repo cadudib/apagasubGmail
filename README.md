@@ -10,6 +10,8 @@
 
 [**Baixar a extensão pelo GitHub**](https://github.com/cadudib/apagasubGmail/archive/refs/heads/main.zip)
 
+[**Site oficial e download direto**](https://apagasub.alala.com.br)
+
 </div>
 
 ---
@@ -180,8 +182,20 @@ apagasubGmail/
 |-- docs/
 |   `-- ARCHITECTURE.md
 `-- scripts/
-    `-- package.sh
+    |-- package.sh
+    |-- update.sh
+    `-- deploy-site.sh
 ```
+
+### Landing page
+
+A landing estática fica em `site/` e é publicada em `https://apagasub.alala.com.br`:
+
+```bash
+scripts/deploy-site.sh
+```
+
+O virtual host reproduzível do Caddy está em `deploy/Caddyfile.apagasub`. O deploy publica o ZIP mais recente em `/download/apagasub-latest.zip` e gera `/version.json` a partir do manifesto.
 
 Validação rápida dos scripts:
 

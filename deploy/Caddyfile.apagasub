@@ -1,0 +1,21 @@
+apagasub.alala.com.br {
+	encode gzip zstd
+	root * /var/www/apagasub
+
+	header {
+		Content-Security-Policy "default-src 'self'; base-uri 'self'; connect-src 'self'; font-src 'self'; form-action 'none'; frame-ancestors 'none'; img-src 'self' data:; object-src 'none'; script-src 'self'; style-src 'self'"
+		Permissions-Policy "camera=(), geolocation=(), microphone=()"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		-Server
+	}
+
+	@static path *.css *.js *.svg
+	header @static Cache-Control "public, max-age=604800"
+
+	@dynamic path /version.json /download/*
+	header @dynamic Cache-Control "no-store"
+
+	file_server
+}
