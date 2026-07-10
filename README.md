@@ -4,7 +4,7 @@
 
 **Encontre newsletters, cancele inscrições e limpe mensagens antigas sem sair do Gmail.**
 
-[![Versão](https://img.shields.io/badge/versao-1.52-0b57d0?style=flat-square)](https://github.com/cadudib/apagasubGmail)
+[![Versão](https://img.shields.io/badge/versao-1.53-0b57d0?style=flat-square)](https://github.com/cadudib/apagasubGmail)
 [![Chrome](https://img.shields.io/badge/Chrome-Manifest_V3-34a853?style=flat-square&logo=googlechrome&logoColor=white)](https://www.google.com/chrome/)
 [![JavaScript](https://img.shields.io/badge/JavaScript-sem_dependencias-f7df1e?style=flat-square&logo=javascript&logoColor=111)](https://github.com/cadudib/apagasubGmail)
 
@@ -65,7 +65,7 @@ No canto superior direito da página, ative a opção **Modo do desenvolvedor**.
 
 1. Clique em **Carregar sem compactação**.
 2. Selecione a pasta `apagasubGmail-main` que foi extraída.
-3. Confirme que o cartão **Apaga Sub V1.52** apareceu na lista de extensões.
+3. Confirme que o cartão **Apaga Sub V1.53** apareceu na lista de extensões.
 
 > [!TIP]
 > No menu de extensões do Chrome, clique no ícone de alfinete ao lado de **Apaga Sub** para deixá-la sempre visivel na barra do navegador.
@@ -112,6 +112,15 @@ Para os primeiros testes, mantenha o modo **Seguro** e a opção **Exigir simula
 ## Atualização
 
 Como a extensão é instalada manualmente, o Chrome não a atualiza sozinho.
+
+Se a extensão foi carregada diretamente da pasta fixa `/opt/extchrome/apagasub`, execute:
+
+```bash
+cd /opt/extchrome/apagasub
+./scripts/update.sh
+```
+
+O script busca a versão mais recente no GitHub, atualiza somente por avanço seguro do Git, valida os scripts e gera o pacote ZIP. Depois, clique em **Recarregar** em `chrome://extensions` ou reinicie o Chrome.
 
 1. Baixe novamente o [ZIP do GitHub](https://github.com/cadudib/apagasubGmail/archive/refs/heads/main.zip).
 2. Extraia o novo arquivo em uma pasta.
@@ -190,6 +199,12 @@ scripts/package.sh
 Mais detalhes técnicos estão em [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Versão atual
+
+### V1.53
+
+- Verifica automaticamente no GitHub se existe uma versão mais recente.
+- Exibe um aviso no popup sem baixar ou executar código remotamente.
+- Adiciona um atualizador seguro para a pasta fixa da instalação manual.
 
 ### V1.52
 

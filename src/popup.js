@@ -48,6 +48,12 @@ const confirmationDialog = document.querySelector("#confirmationDialog");
 const confirmationTitle = document.querySelector("#confirmationTitle");
 const confirmationMessage = document.querySelector("#confirmationMessage");
 const confirmationAcceptButton = document.querySelector("#confirmationAcceptButton");
+const updateNotice = document.querySelector("#updateNotice");
+const updateNoticeTitle = document.querySelector("#updateNoticeTitle");
+const updateNoticeText = document.querySelector("#updateNoticeText");
+const updateStatusText = document.querySelector("#updateStatusText");
+const checkUpdateButton = document.querySelector("#checkUpdateButton");
+const openUpdateButton = document.querySelector("#openUpdateButton");
 
 // Runtime state.
 let subscriptions = [];
@@ -77,6 +83,9 @@ const DEFAULT_BLOCKED_DOMAINS = [
   "mercadopago.com.br"
 ];
 const DEFAULT_PROTECTED_KEYWORDS = ["invoice", "receipt", "security", "bank", "senha", "boleto", "nota fiscal", "pagamento", "fatura"];
+const UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/cadudib/apagasubGmail/main/manifest.json";
+const UPDATE_PAGE_URL = "https://github.com/cadudib/apagasubGmail";
+const UPDATE_CHECK_INTERVAL = 6 * 60 * 60 * 1000;
 
 blockedDomains = [...DEFAULT_BLOCKED_DOMAINS];
 protectedKeywords = [...DEFAULT_PROTECTED_KEYWORDS];
@@ -85,6 +94,7 @@ renderHistory();
 restoreLastOperation();
 applyUiVisibility();
 renderSubscriptions();
+checkForUpdates({ silent: true });
 
 chrome.runtime.onMessage.addListener((message) => {
   if (message?.type === "debugEvent") {
@@ -96,6 +106,9 @@ chrome.runtime.onMessage.addListener((message) => {
     addDebug(message.message);
   }
 });
+
+checkUpdateButton.addEventListener("click", () => checkForUpdates());
+openUpdateButton.addEventListener("click", () => chrome.tabs.create({ url: UPDATE_PAGE_URL }));
 
 // Search and scan actions.
 presetButtons.forEach((button) => {
@@ -173,7 +186,7 @@ backupJsonButton.addEventListener("click", async () => {
   const debug = [...debugLogEl.children].map((item) => item.textContent);
   const backup = {
     exportedAt: new Date().toISOString(),
-    version: "V1.52",
+    version: "V1.53",
     settings: {
       blockedDomains: stored.blockedDomains,
       protectedKeywords: stored.protectedKeywords,
@@ -777,6 +790,59 @@ function isSafeHttpUrl(value) {
 
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function checkForUpdates({ silent = false } = {}) {
+  const currentVersion = chrome.runtime.getManifest().version;
+  const { updateCheck = null } = await chrome.storage.local.get({ updateCheck: null });
+  const isRecent = updateCheck?.checkedAt && Date.now() - updateCheck.checkedAt < UPDATE_CHECK_INTERVAL;
+  if (silent && isRecent) {
+    renderUpdateCheck(updateCheck, currentVersion);
+    return;
+  }
+
+  checkUpdateButton.disabled = true;
+  updateStatusText.textContent = "Consultando a versão publicada no GitHub.";
+  try {
+    const response = await fetch(`${UPDATE_MANIFEST_URL}?t=${Date.now()}`, { cache: "no-store" });
+    if (!response.ok) throw new Error(`GitHub respondeu ${response.status}`);
+    const manifest = await response.json();
+    if (!/^\d+\.\d+\.\d+$/.test(manifest.version || "")) throw new Error("versão remota inválida");
+    const state = { checkedAt: Date.now(), remoteVersion: manifest.version, error: "" };
+    await chrome.storage.local.set({ updateCheck: state });
+    renderUpdateCheck(state, currentVersion);
+  } catch (error) {
+    const state = { checkedAt: Date.now(), remoteVersion: "", error: error.message };
+    await chrome.storage.local.set({ updateCheck: state });
+    renderUpdateCheck(state, currentVersion);
+  } finally {
+    checkUpdateButton.disabled = false;
+  }
+}
+
+function renderUpdateCheck(state, currentVersion) {
+  if (state.error) {
+    updateStatusText.textContent = `Não foi possível verificar agora: ${state.error}.`;
+    return;
+  }
+  const hasUpdate = compareVersions(state.remoteVersion, currentVersion) > 0;
+  updateNotice.hidden = !hasUpdate;
+  if (hasUpdate) {
+    updateNoticeTitle.textContent = `Versão ${state.remoteVersion} disponível`;
+    updateNoticeText.textContent = `Instalada: ${currentVersion}. Atualize a pasta fixa e recarregue a extensão.`;
+    updateStatusText.textContent = `Nova versão ${state.remoteVersion} disponível. Você usa ${currentVersion}.`;
+    return;
+  }
+  updateStatusText.textContent = `Você está usando a versão mais recente (${currentVersion}).`;
+}
+
+function compareVersions(left, right) {
+  const leftParts = left.split(".").map(Number);
+  const rightParts = right.split(".").map(Number);
+  for (let index = 0; index < 3; index += 1) {
+    if (leftParts[index] !== rightParts[index]) return leftParts[index] - rightParts[index];
+  }
+  return 0;
 }
 
 function uiDelay(normalMs) {

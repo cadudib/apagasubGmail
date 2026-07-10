@@ -63,6 +63,13 @@ Stored keys:
 - `dryRuns`
 - `lastOperation`
 - `cleanupStopRequested`
+- `updateCheck`
+
+## Manual Updates
+
+The popup reads only the public `manifest.json` from GitHub to compare versions. It never downloads or executes remote code. The result is cached locally for six hours.
+
+For installations loaded from the fixed Git clone at `/opt/extchrome/apagasub`, `scripts/update.sh` fetches `origin/main`, accepts only a fast-forward update, validates JavaScript and the manifest, and rebuilds the ZIP. Chrome still requires an extension reload or browser restart to apply changed unpacked files.
 
 ## Release Checklist
 
