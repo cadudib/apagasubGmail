@@ -570,3 +570,65 @@ textarea {
   padding: 8px;
   font-size: 12px;
 }
+
+.confirmation-dialog {
+  width: min(400px, calc(100% - 32px));
+  max-height: calc(100% - 32px);
+  margin: auto;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 24px 70px rgba(31, 64, 104, 0.28);
+  color: var(--text);
+  padding: 0;
+}
+
+.confirmation-dialog::backdrop {
+  background: rgba(17, 31, 48, 0.48);
+  backdrop-filter: blur(3px);
+}
+
+.confirmation-dialog form {
+  padding: 20px;
+}
+
+.dialog-kicker {
+  color: var(--danger);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.confirmation-dialog h2 {
+  margin: 5px 0 8px;
+  font-size: 19px;
+  letter-spacing: -0.025em;
+}
+
+.confirmation-message {
+  max-height: 220px;
+  overflow: auto;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+.confirmation-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+#confirmationAcceptButton {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: #ffffff;
+}
+
+#confirmationAcceptButton:hover {
+  border-color: var(--danger-hover);
+  background: var(--danger-hover);
+}

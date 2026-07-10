@@ -11,7 +11,7 @@
       <header class="topbar">
         <div>
           <span class="eyebrow">Limpeza segura do Gmail</span>
-          <h1>Apaga Sub <small>V1.49</small></h1>
+          <h1>Apaga Sub <small>V1.50</small></h1>
           <p id="status" role="status" aria-live="polite">Escolha um termo pronto para preencher a busca do Gmail.</p>
         </div>
       </header>
@@ -173,6 +173,18 @@
         <ol id="debugLog" class="debug-log"></ol>
       </section>
     </main>
+
+    <dialog id="confirmationDialog" class="confirmation-dialog" aria-labelledby="confirmationTitle" aria-describedby="confirmationMessage">
+      <form method="dialog">
+        <span class="dialog-kicker">Confirmação necessária</span>
+        <h2 id="confirmationTitle">Revisar ação</h2>
+        <p id="confirmationMessage" class="confirmation-message"></p>
+        <div class="confirmation-actions">
+          <button id="confirmationCancelButton" value="cancel" type="submit">Cancelar</button>
+          <button id="confirmationAcceptButton" value="confirm" type="submit">Continuar</button>
+        </div>
+      </form>
+    </dialog>
 
     <template id="subscriptionTemplate">
       <article class="subscription">

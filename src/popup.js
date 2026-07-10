@@ -44,6 +44,10 @@ const selectAll = document.querySelector("#selectAll");
 const template = document.querySelector("#subscriptionTemplate");
 const presetButtons = document.querySelectorAll(".preset-button");
 const tabButtons = document.querySelectorAll(".tab-button");
+const confirmationDialog = document.querySelector("#confirmationDialog");
+const confirmationTitle = document.querySelector("#confirmationTitle");
+const confirmationMessage = document.querySelector("#confirmationMessage");
+const confirmationAcceptButton = document.querySelector("#confirmationAcceptButton");
 
 // Runtime state.
 let subscriptions = [];
@@ -168,7 +172,7 @@ backupJsonButton.addEventListener("click", async () => {
   const debug = [...debugLogEl.children].map((item) => item.textContent);
   const backup = {
     exportedAt: new Date().toISOString(),
-    version: "V1.49",
+    version: "V1.50",
     settings: {
       blockedDomains: stored.blockedDomains,
       protectedKeywords: stored.protectedKeywords,
@@ -364,7 +368,7 @@ unsubscribeButton.addEventListener("click", async () => {
       return;
     }
   }
-  if (!confirmCleanupMode(selected)) return;
+  if (!(await confirmCleanupMode(selected))) return;
 
   await runAction(`Saindo de ${selected.length} selecionada(s)...`, async () => {
     markItemsProcessing(selected);
@@ -524,7 +528,7 @@ async function runSenderCleanup(sender, { simulate, byDomain = false, pagination
   const confirmText = byDomain
     ? `ATENÇÃO: isso vai buscar e enviar para a lixeira mensagens visíveis do domínio inteiro:\n\n${domain}\n\nContinuar?`
     : `Filtrar e enviar para a lixeira os e-mails visíveis de:\n\n${sender.email}\n\nLimite: ${limitText}\n\nContinuar?`;
-  if (!simulate && !confirm(confirmText)) {
+  if (!simulate && !(await showConfirmation({ title: byDomain ? "Apagar domínio inteiro?" : "Apagar mensagens?", message: confirmText }))) {
     setStatus("Ação cancelada.");
     return;
   }
@@ -572,7 +576,10 @@ async function runBatchCleanup({ simulate }) {
   const limitText = limit === 0 ? "até acabar" : `${limit} página(s)`;
   const preview = runnable.slice(0, 12).join("\n");
   const blockedText = blocked.length ? `\n\nBloqueados/ignorados:\n${blocked.slice(0, 8).join("\n")}` : "";
-  if (!simulate && !confirm(`Executar apagar lote para ${runnable.length} remetente(s)?\n\nLimite por remetente: ${limitText}\n\nRemetentes:\n${preview}${runnable.length > 12 ? "\n..." : ""}${blockedText}\n\nContinuar?`)) return;
+  if (!simulate && !(await showConfirmation({
+    title: `Apagar ${runnable.length} remetente(s)?`,
+    message: `Limite por remetente: ${limitText}\n\nRemetentes:\n${preview}${runnable.length > 12 ? "\n..." : ""}${blockedText}`
+  }))) return;
   if (!simulate) {
     await saveAuditPlan({ target: runnable.join(", "), query: "batch", byDomain: false, pageLimit: limit, source: "batch", count: runnable.length });
   }
@@ -1093,16 +1100,31 @@ function csvCell(value) {
   return `"${String(value ?? "").replace(/"/g, '""')}"`;
 }
 
-function confirmCleanupMode(items) {
+async function confirmCleanupMode(items) {
   if (cleanupModeSelect.value !== "auto") return true;
   const senders = uniqueSenderEmails(items);
   const blocked = senders.map(blockedSenderReason).find(Boolean);
   if (blocked) {
-    alert(`Há remetente bloqueado por segurança: ${blocked}. Ele será ignorado na limpeza automática.`);
+    addDebug(`Remetente bloqueado ignorado na limpeza automática: ${blocked}`);
   }
   const preview = senders.length ? senders.slice(0, 5).join("\n") : "remetentes sem e-mail claro";
   const extra = senders.length > 5 ? `\n...e mais ${senders.length - 5}` : "";
-  return confirm(`Modo automático vai selecionar e enviar para a lixeira os e-mails visíveis destes remetentes após o descadastro:\n\n${preview}${extra}\n\nContinuar?`);
+  const blockedText = blocked ? `\n\nProteção ativa: ${blocked} será ignorado.` : "";
+  return showConfirmation({
+    title: "Ativar limpeza automática?",
+    message: `A extensão enviará para a lixeira os e-mails visíveis destes remetentes após o descadastro:\n\n${preview}${extra}${blockedText}`
+  });
+}
+
+function showConfirmation({ title, message, acceptLabel = "Continuar" }) {
+  confirmationTitle.textContent = title;
+  confirmationMessage.textContent = message;
+  confirmationAcceptButton.textContent = acceptLabel;
+  confirmationDialog.showModal();
+  confirmationAcceptButton.focus();
+  return new Promise((resolve) => {
+    confirmationDialog.addEventListener("close", () => resolve(confirmationDialog.returnValue === "confirm"), { once: true });
+  });
 }
 
 function blockedSenderReason(email) {
