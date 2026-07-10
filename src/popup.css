@@ -613,6 +613,12 @@ input[type="checkbox"] {
   font-size: 12px;
 }
 
+.update-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
 .update-command {
   border-top: 1px solid var(--border);
   padding-top: 9px;

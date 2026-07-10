@@ -71,6 +71,8 @@ The popup reads only the public `manifest.json` from GitHub to compare versions.
 
 For installations loaded from the fixed Git clone at `/opt/extchrome/apagasub`, `scripts/update.sh` fetches `origin/main`, accepts only a fast-forward update, validates JavaScript and the manifest, and rebuilds the ZIP. Chrome still requires an extension reload or browser restart to apply changed unpacked files.
 
+`updater/server.py` adds an optional one-click path on `127.0.0.1:17853`. It accepts only extension origins, exposes no arbitrary arguments, serializes update runs, and invokes the fixed update and site-deploy scripts. The popup calls `chrome.runtime.reload()` only after a successful response.
+
 ## Release Checklist
 
 1. Run `node --check src/popup.js`.

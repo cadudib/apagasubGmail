@@ -1,5 +1,5 @@
 (() => {
-  const CONTENT_VERSION = "1.53.0";
+  const CONTENT_VERSION = "1.54.0";
   if (globalThis.__apagaSubVersion === CONTENT_VERSION) return;
   if (globalThis.__apagaSubMessageListener) {
     chrome.runtime.onMessage.removeListener(globalThis.__apagaSubMessageListener);

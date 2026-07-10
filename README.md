@@ -4,7 +4,7 @@
 
 **Encontre newsletters, cancele inscrições e limpe mensagens antigas sem sair do Gmail.**
 
-[![Versão](https://img.shields.io/badge/versao-1.53-0b57d0?style=flat-square)](https://github.com/cadudib/apagasubGmail)
+[![Versão](https://img.shields.io/badge/versao-1.54-0b57d0?style=flat-square)](https://github.com/cadudib/apagasubGmail)
 [![Chrome](https://img.shields.io/badge/Chrome-Manifest_V3-34a853?style=flat-square&logo=googlechrome&logoColor=white)](https://www.google.com/chrome/)
 [![JavaScript](https://img.shields.io/badge/JavaScript-sem_dependencias-f7df1e?style=flat-square&logo=javascript&logoColor=111)](https://github.com/cadudib/apagasubGmail)
 
@@ -67,7 +67,7 @@ No canto superior direito da página, ative a opção **Modo do desenvolvedor**.
 
 1. Clique em **Carregar sem compactação**.
 2. Selecione a pasta `apagasubGmail-main` que foi extraída.
-3. Confirme que o cartão **Apaga Sub V1.53** apareceu na lista de extensões.
+3. Confirme que o cartão **Apaga Sub V1.54** apareceu na lista de extensões.
 
 > [!TIP]
 > No menu de extensões do Chrome, clique no ícone de alfinete ao lado de **Apaga Sub** para deixá-la sempre visivel na barra do navegador.
@@ -123,6 +123,16 @@ cd /opt/extchrome/apagasub
 ```
 
 O script busca a versão mais recente no GitHub, atualiza somente por avanço seguro do Git, valida os scripts e gera o pacote ZIP. Depois, clique em **Recarregar** em `chrome://extensions` ou reinicie o Chrome.
+
+### Atualização em um clique
+
+Na máquina que mantém a extensão na pasta fixa, instale uma vez o serviço local:
+
+```bash
+sudo ./scripts/install-updater.sh
+```
+
+Depois disso, o aviso de nova versão no popup oferece **Atualizar agora**. O serviço aceita somente chamadas da extensão, escuta apenas em `127.0.0.1` e executa exclusivamente o fluxo seguro de atualização deste repositório.
 
 1. Baixe novamente o [ZIP do GitHub](https://github.com/cadudib/apagasubGmail/archive/refs/heads/main.zip).
 2. Extraia o novo arquivo em uma pasta.
@@ -213,6 +223,12 @@ scripts/package.sh
 Mais detalhes técnicos estão em [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Versão atual
+
+### V1.54
+
+- Adiciona atualização em um clique para instalações manuais na pasta fixa.
+- Usa um serviço local restrito ao loopback e sem parâmetros arbitrários.
+- Atualiza código, pacote e landing antes de recarregar a extensão.
 
 ### V1.53
 

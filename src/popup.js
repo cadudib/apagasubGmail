@@ -54,6 +54,7 @@ const updateNoticeText = document.querySelector("#updateNoticeText");
 const updateStatusText = document.querySelector("#updateStatusText");
 const checkUpdateButton = document.querySelector("#checkUpdateButton");
 const openUpdateButton = document.querySelector("#openUpdateButton");
+const manualUpdateButton = document.querySelector("#manualUpdateButton");
 
 // Runtime state.
 let subscriptions = [];
@@ -83,8 +84,9 @@ const DEFAULT_BLOCKED_DOMAINS = [
   "mercadopago.com.br"
 ];
 const DEFAULT_PROTECTED_KEYWORDS = ["invoice", "receipt", "security", "bank", "senha", "boleto", "nota fiscal", "pagamento", "fatura"];
-const UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/cadudib/apagasubGmail/main/manifest.json";
-const UPDATE_PAGE_URL = "https://github.com/cadudib/apagasubGmail";
+const UPDATE_MANIFEST_URL = "https://apagasub.alala.com.br/version.json";
+const UPDATE_PAGE_URL = "https://apagasub.alala.com.br/#instalar";
+const LOCAL_UPDATER_URL = "http://127.0.0.1:17853";
 const UPDATE_CHECK_INTERVAL = 6 * 60 * 60 * 1000;
 
 blockedDomains = [...DEFAULT_BLOCKED_DOMAINS];
@@ -108,7 +110,8 @@ chrome.runtime.onMessage.addListener((message) => {
 });
 
 checkUpdateButton.addEventListener("click", () => checkForUpdates());
-openUpdateButton.addEventListener("click", () => chrome.tabs.create({ url: UPDATE_PAGE_URL }));
+openUpdateButton.addEventListener("click", installUpdate);
+manualUpdateButton.addEventListener("click", () => chrome.tabs.create({ url: UPDATE_PAGE_URL }));
 
 // Search and scan actions.
 presetButtons.forEach((button) => {
@@ -186,7 +189,7 @@ backupJsonButton.addEventListener("click", async () => {
   const debug = [...debugLogEl.children].map((item) => item.textContent);
   const backup = {
     exportedAt: new Date().toISOString(),
-    version: "V1.53",
+    version: "V1.54",
     settings: {
       blockedDomains: stored.blockedDomains,
       protectedKeywords: stored.protectedKeywords,
@@ -802,10 +805,10 @@ async function checkForUpdates({ silent = false } = {}) {
   }
 
   checkUpdateButton.disabled = true;
-  updateStatusText.textContent = "Consultando a versão publicada no GitHub.";
+  updateStatusText.textContent = "Consultando a versão publicada no site.";
   try {
     const response = await fetch(`${UPDATE_MANIFEST_URL}?t=${Date.now()}`, { cache: "no-store" });
-    if (!response.ok) throw new Error(`GitHub respondeu ${response.status}`);
+    if (!response.ok) throw new Error(`site respondeu ${response.status}`);
     const manifest = await response.json();
     if (!/^\d+\.\d+\.\d+$/.test(manifest.version || "")) throw new Error("versão remota inválida");
     const state = { checkedAt: Date.now(), remoteVersion: manifest.version, error: "" };
@@ -829,11 +832,31 @@ function renderUpdateCheck(state, currentVersion) {
   updateNotice.hidden = !hasUpdate;
   if (hasUpdate) {
     updateNoticeTitle.textContent = `Versão ${state.remoteVersion} disponível`;
-    updateNoticeText.textContent = `Instalada: ${currentVersion}. Atualize a pasta fixa e recarregue a extensão.`;
+    updateNoticeText.textContent = `Instalada: ${currentVersion}. O serviço local fará a instalação e o reload.`;
     updateStatusText.textContent = `Nova versão ${state.remoteVersion} disponível. Você usa ${currentVersion}.`;
     return;
   }
   updateStatusText.textContent = `Você está usando a versão mais recente (${currentVersion}).`;
+}
+
+async function installUpdate() {
+  openUpdateButton.disabled = true;
+  checkUpdateButton.disabled = true;
+  openUpdateButton.textContent = "Atualizando...";
+  updateStatusText.textContent = "Baixando, validando e publicando a atualização local.";
+  try {
+    const response = await fetch(`${LOCAL_UPDATER_URL}/update`, { method: "POST", cache: "no-store" });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.ok) throw new Error(result.error || `serviço respondeu ${response.status}`);
+    updateStatusText.textContent = `Versão ${result.version} instalada. Recarregando a extensão.`;
+    openUpdateButton.textContent = "Instalada";
+    setTimeout(() => chrome.runtime.reload(), 900);
+  } catch (error) {
+    updateStatusText.textContent = `Atualização local indisponível: ${error.message}. Use o download manual.`;
+    openUpdateButton.textContent = "Tentar novamente";
+    openUpdateButton.disabled = false;
+    checkUpdateButton.disabled = false;
+  }
 }
 
 function compareVersions(left, right) {
