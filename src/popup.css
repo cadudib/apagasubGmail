@@ -250,6 +250,47 @@ p {
   line-height: 1.4;
 }
 
+#status {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 7px;
+  text-wrap: pretty;
+}
+
+#status::before {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: #9babbc;
+  content: "";
+}
+
+#status.error {
+  color: var(--danger);
+}
+
+#status.error::before {
+  background: var(--danger);
+}
+
+body[data-busy="true"] #status::before {
+  width: 9px;
+  height: 9px;
+  margin-top: 3px;
+  border: 2px solid rgba(22, 103, 197, 0.22);
+  border-top-color: var(--primary);
+  background: transparent;
+  animation: status-spin 720ms linear infinite;
+}
+
+@keyframes status-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .controls {
   display: grid;
   gap: 10px;
@@ -427,6 +468,39 @@ input[type="checkbox"] {
   line-height: 1.4;
 }
 
+.empty {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 3px 11px;
+  align-items: center;
+  border-style: dashed;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.empty::before {
+  grid-row: 1 / span 2;
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  content: "⌕";
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.empty strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.empty span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .error {
   color: var(--danger);
 }
@@ -523,6 +597,8 @@ textarea {
   *,
   *::before,
   *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
   }

@@ -1,6 +1,6 @@
 (() => {
-  if (globalThis.__apagaSubVersion === "1.50.0") return;
-  globalThis.__apagaSubVersion = "1.50.0";
+  if (globalThis.__apagaSubVersion === "1.51.0") return;
+  globalThis.__apagaSubVersion = "1.51.0";
 
   const TEXT_MATCH = /(unsubscribe|unsubscribe here|cancelar inscrição|cancelar inscri[cç][aã]o|cancelar assinatura|cancelar sua assinatura|cancelar subscrição|cancelar a subscri[cç][aã]o|descadastrar|descadastre|sair da lista|remover inscrição|remover inscri[cç][aã]o|gerenciar preferências|gerenciar preferencias)/i;
   const scanSenderCache = new Set();

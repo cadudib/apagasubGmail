@@ -84,6 +84,7 @@ loadSettings();
 renderHistory();
 restoreLastOperation();
 applyUiVisibility();
+renderSubscriptions();
 
 chrome.runtime.onMessage.addListener((message) => {
   if (message?.type === "debugEvent") {
@@ -172,7 +173,7 @@ backupJsonButton.addEventListener("click", async () => {
   const debug = [...debugLogEl.children].map((item) => item.textContent);
   const backup = {
     exportedAt: new Date().toISOString(),
-    version: "V1.50",
+    version: "V1.51",
     settings: {
       blockedDomains: stored.blockedDomains,
       protectedKeywords: stored.protectedKeywords,
@@ -618,7 +619,7 @@ function renderSubscriptions() {
   selectAll.checked = false;
 
   if (!subscriptions.length) {
-    resultsEl.innerHTML = '<div class="empty">Use uma busca pronta e depois clique em Varrer página.</div>';
+    resultsEl.innerHTML = '<div class="empty"><strong>Nenhum resultado nesta sessão</strong><span>Escolha uma busca pronta ou leia as linhas visíveis do Gmail.</span></div>';
     syncActions();
     return;
   }
@@ -833,6 +834,8 @@ function syncActions() {
 
 function setBusy(isBusy) {
   busy = isBusy;
+  document.body.dataset.busy = String(isBusy);
+  resultsEl.setAttribute("aria-busy", String(isBusy));
   scanButton.disabled = isBusy;
   deepScanButton.disabled = isBusy;
   filterSenderButton.disabled = isBusy;
