@@ -168,7 +168,7 @@ backupJsonButton.addEventListener("click", async () => {
   const debug = [...debugLogEl.children].map((item) => item.textContent);
   const backup = {
     exportedAt: new Date().toISOString(),
-    version: "V1.48",
+    version: "V1.49",
     settings: {
       blockedDomains: stored.blockedDomains,
       protectedKeywords: stored.protectedKeywords,
@@ -404,6 +404,19 @@ tabButtons.forEach((button) => {
     activeTab = button.dataset.tab || "search";
     saveUiPrefs();
     applyUiVisibility();
+  });
+  button.addEventListener("keydown", (event) => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const buttons = [...tabButtons];
+    const currentIndex = buttons.indexOf(button);
+    const targetIndex = event.key === "Home"
+      ? 0
+      : event.key === "End"
+        ? buttons.length - 1
+        : (currentIndex + (event.key === "ArrowRight" ? 1 : -1) + buttons.length) % buttons.length;
+    buttons[targetIndex].click();
+    buttons[targetIndex].focus();
   });
 });
 
@@ -1185,7 +1198,9 @@ function applyUiVisibility() {
   const isAdvanced = uiModeSelect.value === "advanced";
   moreActionsButton.textContent = showMoreActions ? "Menos ações" : "Mais ações";
   tabButtons.forEach((button) => {
-    button.setAttribute("aria-selected", String((button.dataset.tab || "search") === activeTab));
+    const isSelected = (button.dataset.tab || "search") === activeTab;
+    button.setAttribute("aria-selected", String(isSelected));
+    button.tabIndex = isSelected ? 0 : -1;
   });
   document.querySelectorAll("[data-group]").forEach((element) => {
     const sameGroup = (element.dataset.group || "").split(/\s+/).includes(activeTab);

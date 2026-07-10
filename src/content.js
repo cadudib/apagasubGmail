@@ -1,6 +1,6 @@
 (() => {
-  if (globalThis.__apagaSubVersion === "1.48.0") return;
-  globalThis.__apagaSubVersion = "1.48.0";
+  if (globalThis.__apagaSubVersion === "1.49.0") return;
+  globalThis.__apagaSubVersion = "1.49.0";
 
   const TEXT_MATCH = /(unsubscribe|unsubscribe here|cancelar inscrição|cancelar inscri[cç][aã]o|cancelar assinatura|cancelar sua assinatura|cancelar subscrição|cancelar a subscri[cç][aã]o|descadastrar|descadastre|sair da lista|remover inscrição|remover inscri[cç][aã]o|gerenciar preferências|gerenciar preferencias)/i;
   const scanSenderCache = new Set();
@@ -912,17 +912,6 @@
     const safeNextButton = findNextPageButton();
     if (!safeNextButton) return false;
     activateElement(safeNextButton);
-    return true;
-
-    const nextButton = [...document.querySelectorAll("[aria-label], [data-tooltip], [role='button'], div[role='button']")]
-      .filter(isVisible)
-      .find((element) => {
-        const text = elementSearchText(element);
-        return /^(next|próxima|proxima|mais recentes|mais antigas|older|newer)$/i.test(text) ||
-          /next page|página seguinte|pagina seguinte|mais antigas/i.test(text);
-      });
-    if (!nextButton) return false;
-    activateElement(nextButton);
     return true;
   }
 
