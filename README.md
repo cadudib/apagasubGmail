@@ -4,7 +4,7 @@
 
 **Encontre newsletters, cancele inscrições e limpe mensagens antigas sem sair do Gmail.**
 
-[![Versão](https://img.shields.io/badge/versao-1.51-0b57d0?style=flat-square)](https://github.com/cadudib/apagasubGmail)
+[![Versão](https://img.shields.io/badge/versao-1.52-0b57d0?style=flat-square)](https://github.com/cadudib/apagasubGmail)
 [![Chrome](https://img.shields.io/badge/Chrome-Manifest_V3-34a853?style=flat-square&logo=googlechrome&logoColor=white)](https://www.google.com/chrome/)
 [![JavaScript](https://img.shields.io/badge/JavaScript-sem_dependencias-f7df1e?style=flat-square&logo=javascript&logoColor=111)](https://github.com/cadudib/apagasubGmail)
 
@@ -65,7 +65,7 @@ No canto superior direito da página, ative a opção **Modo do desenvolvedor**.
 
 1. Clique em **Carregar sem compactação**.
 2. Selecione a pasta `apagasubGmail-main` que foi extraída.
-3. Confirme que o cartão **Apaga Sub V1.51** apareceu na lista de extensões.
+3. Confirme que o cartão **Apaga Sub V1.52** apareceu na lista de extensões.
 
 > [!TIP]
 > No menu de extensões do Chrome, clique no ícone de alfinete ao lado de **Apaga Sub** para deixá-la sempre visivel na barra do navegador.
@@ -190,6 +190,11 @@ scripts/package.sh
 Mais detalhes técnicos estão em [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Versão atual
+
+### V1.52
+
+- Impede listeners duplicados quando o content script é reinjetado após uma atualização.
+- Mantém apenas uma instância ativa da comunicação entre popup e Gmail.
 
 ### V1.51
 

@@ -173,7 +173,7 @@ backupJsonButton.addEventListener("click", async () => {
   const debug = [...debugLogEl.children].map((item) => item.textContent);
   const backup = {
     exportedAt: new Date().toISOString(),
-    version: "V1.51",
+    version: "V1.52",
     settings: {
       blockedDomains: stored.blockedDomains,
       protectedKeywords: stored.protectedKeywords,

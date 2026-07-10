@@ -1,6 +1,10 @@
 (() => {
-  if (globalThis.__apagaSubVersion === "1.51.0") return;
-  globalThis.__apagaSubVersion = "1.51.0";
+  const CONTENT_VERSION = "1.52.0";
+  if (globalThis.__apagaSubVersion === CONTENT_VERSION) return;
+  if (globalThis.__apagaSubMessageListener) {
+    chrome.runtime.onMessage.removeListener(globalThis.__apagaSubMessageListener);
+  }
+  globalThis.__apagaSubVersion = CONTENT_VERSION;
 
   const TEXT_MATCH = /(unsubscribe|unsubscribe here|cancelar inscrição|cancelar inscri[cç][aã]o|cancelar assinatura|cancelar sua assinatura|cancelar subscrição|cancelar a subscri[cç][aã]o|descadastrar|descadastre|sair da lista|remover inscrição|remover inscri[cç][aã]o|gerenciar preferências|gerenciar preferencias)/i;
   const scanSenderCache = new Set();
@@ -8,12 +12,14 @@
   let activeOperation = "";
 
   // Message routing.
-  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  const messageListener = (message, _sender, sendResponse) => {
     handleMessage(message)
       .then(sendResponse)
       .catch((error) => sendResponse({ ok: false, error: error.message }));
     return true;
-  });
+  };
+  globalThis.__apagaSubMessageListener = messageListener;
+  chrome.runtime.onMessage.addListener(messageListener);
 
   function debug(message) {
     if (activeSpeedMode === "fast" && /Verificando|Pulando remetente|Botões visíveis|Controles superiores/.test(message)) return;
